@@ -1,0 +1,9 @@
+﻿node_modules/
+dist/
+.env
+certs/
+*.key
+*.crt
+*.pfx
+*.p12
+.DS_Store
