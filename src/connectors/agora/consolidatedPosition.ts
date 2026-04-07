@@ -47,9 +47,12 @@ export async function getAgoraConsolidatedPosition(
       `/managers-portfolio-mgmt/v1/listsummary/${cpfCnpj}/${accountCode}`
     );
 
-    const products = data?.result?.products ?? [];
+    const rawProducts = data?.result?.products ?? {};
+const products = Array.isArray(rawProducts)
+  ? rawProducts
+  : Object.values(rawProducts);
 
-    const assets: UnifiedAsset[] = Object.entries(products).map(([_, p]: any) => ({
+const assets: UnifiedAsset[] = products.map((p: any) => ({
       assetClass: mapInstrumentType(p.instrumentType),
       name: p.description ?? p.instrumentType,
       grossValue: p.grossPatrimony ?? 0,
