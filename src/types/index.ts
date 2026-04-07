@@ -3,7 +3,7 @@
 // Modelo normalizado independente da instituição de origem
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type Institution = 'BTG' | 'XP';
+export type Institution = 'BTG' | 'XP' | 'AGORA';
 
 export type AssetClass =
   | 'FIXED_INCOME'
