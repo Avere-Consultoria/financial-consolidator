@@ -101,17 +101,14 @@ export async function getAgoraHeaders(): Promise<Record<string, string>> {
   const token   = await getAgoraToken();
   const cpfcnpj = process.env.AGORA_CPFCNPJ_CHAVE;
 
-  if (!cpfcnpj) {
-    throw new ConsolidatorError(
-      'AGORA_MISSING_CPFCNPJ',
-      'AGORA_CPFCNPJ_CHAVE não configurado (formato: cnpj.chave_seguranca)',
-      'AGORA', 500
-    );
-  }
-
-  return {
+  const headers: Record<string, string> = {
     Authorization: `Bearer ${token}`,
-    cpfcnpj,
     'Content-Type': 'application/json',
   };
+
+  if (cpfcnpj) {
+    headers['cpfcnpj'] = cpfcnpj;
+  }
+
+  return headers;
 }
