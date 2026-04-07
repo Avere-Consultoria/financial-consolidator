@@ -1,10 +1,12 @@
 import { Router, Request, Response } from 'express';
+import axios from 'axios';
 import {
   getAgoraConsolidatedPosition,
   getAgoraSummary,
   getAgoraListSummaryLessPrev,
 } from '../connectors/agora/consolidatedPosition';
-import { ApiResponse, ConsolidatorError } from '../types';
+import { getAgoraBaseUrl, getAgoraHeaders, getAgoraHttpsAgent } from '../connectors/agora/auth';
+import { ConsolidatorError } from '../types';
 import { logger } from '../utils/logger';
 
 const router = Router();
@@ -24,7 +26,6 @@ function handleError(res: Response, err: unknown) {
 }
 
 // GET /api/v1/agora/position/:cpfCnpj/:accountCode
-// Posição consolidada completa (listsummary)
 router.get('/position/:cpfCnpj/:accountCode', async (req: Request, res: Response) => {
   try {
     const { cpfCnpj, accountCode } = req.params;
@@ -34,7 +35,6 @@ router.get('/position/:cpfCnpj/:accountCode', async (req: Request, res: Response
 });
 
 // GET /api/v1/agora/position/:cpfCnpj/:accountCode/summary
-// Posição agrupada por classe de ativo
 router.get('/position/:cpfCnpj/:accountCode/summary', async (req: Request, res: Response) => {
   try {
     const { cpfCnpj, accountCode } = req.params;
@@ -44,13 +44,29 @@ router.get('/position/:cpfCnpj/:accountCode/summary', async (req: Request, res: 
 });
 
 // GET /api/v1/agora/position/:cpfCnpj/:accountCode/less-prev
-// Posição consolidada sem dados projetados
 router.get('/position/:cpfCnpj/:accountCode/less-prev', async (req: Request, res: Response) => {
   try {
     const { cpfCnpj, accountCode } = req.params;
     const data = await getAgoraListSummaryLessPrev(cpfCnpj, accountCode);
     res.json({ success: true, data, meta: { fetchedAt: new Date().toISOString() } });
   } catch (err) { handleError(res, err); }
+});
+
+// GET /api/v1/agora/debug/:cpfCnpj/:accountCode
+// Rota temporária — ver response raw da Ágora
+router.get('/debug/:cpfCnpj/:accountCode', async (req: Request, res: Response) => {
+  try {
+    const { cpfCnpj, accountCode } = req.params;
+    const headers = await getAgoraHeaders();
+    const { data } = await axios.post(
+      `${getAgoraBaseUrl()}/managers-portfolio-mgmt/v1/listsummary/${cpfCnpj}/${accountCode}`,
+      {},
+      { headers, httpsAgent: getAgoraHttpsAgent() }
+    );
+    res.json({ success: true, raw: data });
+  } catch (err: any) {
+    res.json({ success: false, error: err?.response?.data ?? err.message });
+  }
 });
 
 export default router;
