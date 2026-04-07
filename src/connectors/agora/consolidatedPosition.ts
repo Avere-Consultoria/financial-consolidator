@@ -47,30 +47,34 @@ export async function getAgoraConsolidatedPosition(
       `/managers-portfolio-mgmt/v1/listsummary/${cpfCnpj}/${accountCode}`
     );
 
-    const rawProducts = data?.result?.products ?? {};
-const products = Array.isArray(rawProducts)
-  ? rawProducts
-  : Object.values(rawProducts);
+    // Ágora retorna "allocation" com objetos por classe
+    const allocation = data?.allocation ?? {};
 
-const assets: UnifiedAsset[] = products.map((p: any) => ({
-      assetClass: mapInstrumentType(p.instrumentType),
-      name: p.description ?? p.instrumentType,
+    const classMap: Record<string, AssetClass> = {
+      equity:           'EQUITIES',
+      fixedIncome:      'FIXED_INCOME',
+      multimarket:      'INVESTMENT_FUND',
+      collateral:       'OTHER',
+      derivatives:      'DERIVATIVE',
+      stockLending:     'EQUITIES',
+      projectedBalance: 'CASH',
+    };
+
+    const assets: UnifiedAsset[] = Object.entries(allocation).map(([key, p]: any) => ({
+      assetClass: classMap[key] ?? 'OTHER',
+      name: p.description ?? key,
       grossValue: p.grossPatrimony ?? 0,
-      netValue: p.liquidPatrimony ?? undefined,
-      costPrice: p.purchaseTotal ?? undefined,
       extra: {
-        instrumentType: p.instrumentType,
-        percentagePatrimony: p.percentagePatrimony,
-        valueAppreciation: p.valueAppreciation,
-        percentAppreciation: p.percentAppreciation,
+        code: p.code,
+        percentage: p.percentage,
       },
     }));
 
     return {
       institution: 'AGORA',
       accountNumber: accountCode,
-      positionDate: new Date().toISOString(),
-      totalAmount: data?.valuePatrimonyTotalGross ?? 0,
+      positionDate: data?.referenceDate ?? new Date().toISOString(),
+      totalAmount: data?.totalGrossPatrimony ?? 0,
       currency: 'BRL',
       assets,
       rawMeta: {
