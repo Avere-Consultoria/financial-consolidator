@@ -7,6 +7,7 @@ import agoraRoutes from './routes/agora';        // ← adicionar
 import { logger } from './utils/logger';
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT ?? 3333;
 
 // ─── Middlewares de segurança ──────────────────────────────────────────────────
