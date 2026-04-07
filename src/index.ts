@@ -3,6 +3,7 @@ import express from 'express';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import positionRoutes from './routes/position';
+import agoraRoutes from './routes/agora';        // ← adicionar
 import { logger } from './utils/logger';
 
 const app = express();
@@ -14,8 +15,8 @@ app.use(express.json());
 
 // Rate limit — protege o consolidador de abusos internos
 const limiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minuto
-  max: 120,            // 120 req/min por IP
+  windowMs: 60 * 1000,
+  max: 120,
   message: { success: false, error: { code: 'RATE_LIMIT', message: 'Muitas requisições. Tente novamente.' } },
 });
 app.use(limiter);
@@ -26,12 +27,13 @@ app.get('/health', (_req, res) => {
     status: 'ok',
     version: '1.0.0',
     timestamp: new Date().toISOString(),
-    institutions: ['BTG', 'XP'],
+    institutions: ['BTG', 'XP', 'AGORA'],       // ← atualizar
   });
 });
 
 // ─── Rotas ─────────────────────────────────────────────────────────────────────
 app.use('/api/v1/position', positionRoutes);
+app.use('/api/v1/agora', agoraRoutes);           // ← adicionar
 
 // ─── 404 ───────────────────────────────────────────────────────────────────────
 app.use((_req, res) => {
@@ -41,7 +43,7 @@ app.use((_req, res) => {
 // ─── Start ─────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
   logger.info(`🚀 Financial Consolidator rodando na porta ${PORT}`);
-  logger.info(`📊 Instituições disponíveis: BTG Pactual, XP Investimentos`);
+  logger.info(`📊 Instituições disponíveis: BTG Pactual, XP Investimentos, Ágora`);
   logger.info(`🔗 Health check: http://localhost:${PORT}/health`);
 });
 
