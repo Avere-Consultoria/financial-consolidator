@@ -1,8 +1,8 @@
 import axios from 'axios';
-import * as fs from 'fs';
 import * as https from 'https';
 import { logger } from '../../utils/logger';
 import { ConsolidatorError } from '../../types';
+import { loadCert } from '../../utils/certLoader';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Ágora Auth — OAuth2 Client Credentials + mTLS (Bradesco AXWAY)
@@ -23,36 +23,24 @@ export function getAgoraBaseUrl(): string {
 }
 
 export function getAgoraHttpsAgent(): https.Agent {
-  const certPath = process.env.AGORA_CERT_PATH;
-  const keyPath  = process.env.AGORA_KEY_PATH;
-
-  if (!certPath || !keyPath) {
+  try {
+    return new https.Agent({
+      cert: loadCert('AGORA_CERT_BASE64', 'AGORA_CERT_PATH'),
+      key:  loadCert('AGORA_KEY_BASE64',  'AGORA_KEY_PATH'),
+      rejectUnauthorized: process.env.AGORA_ENVIRONMENT === 'production',
+    });
+  } catch (err: any) {
     throw new ConsolidatorError(
-      'AGORA_MISSING_CERT',
-      'Caminhos de certificado Ágora não configurados (AGORA_CERT_PATH, AGORA_KEY_PATH)',
+      'AGORA_CERT_ERROR',
+      `Certificado Ágora: ${err.message}`,
       'AGORA', 500
     );
   }
-  if (!fs.existsSync(certPath) || !fs.existsSync(keyPath)) {
-    throw new ConsolidatorError(
-      'AGORA_CERT_NOT_FOUND',
-      `Certificado ou chave não encontrados: ${certPath} / ${keyPath}`,
-      'AGORA', 500
-    );
-  }
-
-  return new https.Agent({
-    cert: fs.readFileSync(certPath),
-    key:  fs.readFileSync(keyPath),
-    // Sandbox usa certificado autoassinado
-    rejectUnauthorized: process.env.AGORA_ENVIRONMENT === 'production',
-  });
 }
 
 export async function getAgoraToken(): Promise<string> {
   const now = Date.now();
 
-  // Reutiliza token se ainda válido (com 60s de margem)
   if (tokenCache && now < tokenCache.expiresAt - 60_000) {
     logger.debug('Ágora: reutilizando token em cache');
     return tokenCache.token;
@@ -109,7 +97,6 @@ export async function getAgoraToken(): Promise<string> {
   }
 }
 
-// Headers obrigatórios em todas as chamadas AXWAY
 export async function getAgoraHeaders(): Promise<Record<string, string>> {
   const token   = await getAgoraToken();
   const cpfcnpj = process.env.AGORA_CPFCNPJ_CHAVE;

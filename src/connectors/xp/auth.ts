@@ -1,8 +1,8 @@
 import axios from 'axios';
-import * as fs from 'fs';
 import * as https from 'https';
 import { logger } from '../../utils/logger';
 import { ConsolidatorError } from '../../types';
+import { loadCert } from '../../utils/certLoader';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // XP Auth — OAuth2 Client Credentials via Azure AD + mTLS
@@ -35,31 +35,18 @@ export function getXpBaseUrl(): string {
 }
 
 export function getXpHttpsAgent(): https.Agent {
-  const certPath = process.env.XP_CERT_PATH;
-  const keyPath = process.env.XP_KEY_PATH;
-
-  if (!certPath || !keyPath) {
+  try {
+    return new https.Agent({
+      cert: loadCert('XP_CERT_BASE64', 'XP_CERT_PATH'),
+      key:  loadCert('XP_KEY_BASE64',  'XP_KEY_PATH'),
+    });
+  } catch (err: any) {
     throw new ConsolidatorError(
-      'XP_MISSING_CERT',
-      'Caminhos de certificado XP não configurados (XP_CERT_PATH, XP_KEY_PATH)',
-      'XP',
-      500
+      'XP_CERT_ERROR',
+      `Certificado XP: ${err.message}`,
+      'XP', 500
     );
   }
-
-  if (!fs.existsSync(certPath) || !fs.existsSync(keyPath)) {
-    throw new ConsolidatorError(
-      'XP_CERT_NOT_FOUND',
-      `Certificado ou chave XP não encontrados: ${certPath} / ${keyPath}`,
-      'XP',
-      500
-    );
-  }
-
-  return new https.Agent({
-    cert: fs.readFileSync(certPath),
-    key: fs.readFileSync(keyPath),
-  });
 }
 
 export async function getXpToken(): Promise<string> {
@@ -95,6 +82,7 @@ export async function getXpToken(): Promise<string> {
 
     const response = await axios.post(TOKEN_URL, params.toString(), {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      httpsAgent: getXpHttpsAgent(),
     });
 
     const { access_token, expires_in } = response.data;
@@ -107,7 +95,10 @@ export async function getXpToken(): Promise<string> {
     logger.info('XP: token gerado com sucesso');
     return access_token;
   } catch (err: any) {
-    logger.error('XP: erro ao gerar token', { status: err?.response?.status, data: err?.response?.data });
+    logger.error('XP: erro ao gerar token', {
+      status: err?.response?.status,
+      data: err?.response?.data,
+    });
 
     throw new ConsolidatorError(
       'XP_AUTH_ERROR',
