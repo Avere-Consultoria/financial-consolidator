@@ -13,7 +13,7 @@ const isProduction = () => process.env.AGORA_ENVIRONMENT === 'production';
 
 function getBasePath(): string {
   return isProduction()
-    ? '/api/managers-portfolio-mgmt/v1/portfolio'
+    ? '/managers-portfolio-mgmt/v1/portfolio'
     : '/managers-portfolio-mgmt/v1';
 }
 
