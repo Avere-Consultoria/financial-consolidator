@@ -4,9 +4,18 @@ import { UnifiedPosition, UnifiedAsset, AssetClass, ConsolidatorError } from '..
 import { getAgoraBaseUrl, getAgoraHeaders, getAgoraHttpsAgent } from './auth';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Ágora — Posição Consolidada (visão por tipo de instrumento)
-// Todos os endpoints usam POST
+// Ágora — Posição Consolidada
+// Sandbox: POST /managers-portfolio-mgmt/v1/{endpoint}
+// Produção: GET  /api/managers-portfolio-mgmt/v1/portfolio/{endpoint}
 // ─────────────────────────────────────────────────────────────────────────────
+
+const isProduction = () => process.env.AGORA_ENVIRONMENT === 'production';
+
+function getBasePath(): string {
+  return isProduction()
+    ? '/api/managers-portfolio-mgmt/v1/portfolio'
+    : '/managers-portfolio-mgmt/v1';
+}
 
 function mapInstrumentType(code: string): AssetClass {
   const map: Record<string, AssetClass> = {
@@ -25,14 +34,24 @@ function mapInstrumentType(code: string): AssetClass {
   return map[code] ?? 'OTHER';
 }
 
-async function agoraPost(path: string): Promise<any> {
+async function agoraRequest(path: string): Promise<any> {
   const url = `${getAgoraBaseUrl()}${path}`;
   const headers = await getAgoraHeaders();
-  const { data } = await axios.post(url, {}, {
-    headers,
-    httpsAgent: getAgoraHttpsAgent(),
-  });
-  return data;
+  const agent = getAgoraHttpsAgent();
+
+  if (isProduction()) {
+    const { data } = await axios.get(url, {
+      headers,
+      httpsAgent: agent,
+    });
+    return data;
+  } else {
+    const { data } = await axios.post(url, {}, {
+      headers,
+      httpsAgent: agent,
+    });
+    return data;
+  }
 }
 
 // ─── List Summary — patrimônio + distribuição por instrumento ─────────────────
@@ -43,14 +62,16 @@ export async function getAgoraConsolidatedPosition(
   try {
     logger.info(`Ágora: buscando posição consolidada para conta ${accountCode}`);
 
-    const data = await agoraPost(
-      `/managers-portfolio-mgmt/v1/listsummary/${cpfCnpj}/${accountCode}`
+    const data = await agoraRequest(
+      `${getBasePath()}/listsummary/${cpfCnpj}/${accountCode}`
     );
 
-    // Ágora retorna "allocation" com objetos por classe
+    // Sandbox retorna "allocation", produção retorna "result.products"
     const allocation = data?.allocation ?? {};
+    const products = data?.result?.products ?? {};
 
     const classMap: Record<string, AssetClass> = {
+      // sandbox keys
       equity:           'EQUITIES',
       fixedIncome:      'FIXED_INCOME',
       multimarket:      'INVESTMENT_FUND',
@@ -60,21 +81,39 @@ export async function getAgoraConsolidatedPosition(
       projectedBalance: 'CASH',
     };
 
-    const assets: UnifiedAsset[] = Object.entries(allocation).map(([key, p]: any) => ({
-      assetClass: classMap[key] ?? 'OTHER',
-      name: p.description ?? key,
-      grossValue: p.grossPatrimony ?? 0,
-      extra: {
-        code: p.code,
-        percentage: p.percentage,
-      },
-    }));
+    let assets: UnifiedAsset[] = [];
+
+    if (Object.keys(allocation).length > 0) {
+      // Sandbox
+      assets = Object.entries(allocation).map(([key, p]: any) => ({
+        assetClass: classMap[key] ?? 'OTHER',
+        name: p.description ?? key,
+        grossValue: p.grossPatrimony ?? 0,
+        extra: { code: p.code, percentage: p.percentage },
+      }));
+    } else if (Object.keys(products).length > 0) {
+      // Produção
+      const rawProducts = Array.isArray(products) ? products : Object.values(products);
+      assets = rawProducts.map((p: any) => ({
+        assetClass: mapInstrumentType(p.instrumentType),
+        name: p.description ?? p.instrumentType,
+        grossValue: p.grossPatrimony ?? 0,
+        netValue: p.liquidPatrimony ?? undefined,
+        costPrice: p.purchaseTotal ?? undefined,
+        extra: {
+          instrumentType: p.instrumentType,
+          percentagePatrimony: p.percentagePatrimony,
+          valueAppreciation: p.valueAppreciation,
+          percentAppreciation: p.percentAppreciation,
+        },
+      }));
+    }
 
     return {
       institution: 'AGORA',
       accountNumber: accountCode,
       positionDate: data?.referenceDate ?? new Date().toISOString(),
-      totalAmount: data?.totalGrossPatrimony ?? 0,
+      totalAmount: data?.totalGrossPatrimony ?? data?.valuePatrimonyTotalGross ?? 0,
       currency: 'BRL',
       assets,
       rawMeta: {
@@ -104,8 +143,8 @@ export async function getAgoraSummary(
 ): Promise<any> {
   try {
     logger.info(`Ágora: buscando summary para conta ${accountCode}`);
-    return await agoraPost(
-      `/managers-portfolio-mgmt/v1/summary/${cpfCnpj}/${accountCode}`
+    return await agoraRequest(
+      `${getBasePath()}/summary/${cpfCnpj}/${accountCode}`
     );
   } catch (err: any) {
     throw new ConsolidatorError(
@@ -123,8 +162,8 @@ export async function getAgoraListSummaryLessPrev(
   accountCode: string
 ): Promise<any> {
   try {
-    return await agoraPost(
-      `/managers-portfolio-mgmt/v1/listsummaryLessPrev/${cpfCnpj}/${accountCode}`
+    return await agoraRequest(
+      `${getBasePath()}/listsummaryLessPrev/${cpfCnpj}/${accountCode}`
     );
   } catch (err: any) {
     throw new ConsolidatorError(
