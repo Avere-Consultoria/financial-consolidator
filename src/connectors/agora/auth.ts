@@ -101,7 +101,6 @@ export async function getAgoraHeaders(): Promise<Record<string, string>> {
   const token = await getAgoraToken();
   return {
     Authorization: `Bearer ${token}`,
-    'Content-Type': 'application/json',
-    'cpfcnpj': '50859666000178',
+    'Accept': 'application/json',
   };
 }
