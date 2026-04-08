@@ -102,6 +102,6 @@ export async function getAgoraHeaders(): Promise<Record<string, string>> {
   return {
     Authorization: `Bearer ${token}`,
     'Content-Type': 'application/json',
-    'User-Agent': 'insomnia/11.2.0',
+    'cpfcnpj': '50859666000178',
   };
 }
