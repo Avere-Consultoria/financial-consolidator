@@ -37,9 +37,9 @@ async function agoraRequest(path: string): Promise<any> {
   const headers = await getAgoraHeaders();
   const agent = getAgoraHttpsAgent();
 
-  logger.info(`Ágora: chamando URL: ${url}`); // ← adicionar esta linha
+  logger.info(`Ágora: chamando URL: ${url}`);
 
-  const { data } = await axios.post(url, {}, {
+  const { data } = await axios.post(url, null, {
     headers,
     httpsAgent: agent,
   });
