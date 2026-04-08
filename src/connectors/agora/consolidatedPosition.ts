@@ -37,19 +37,11 @@ async function agoraRequest(path: string): Promise<any> {
   const headers = await getAgoraHeaders();
   const agent = getAgoraHttpsAgent();
 
-  if (isProduction()) {
-    const { data } = await axios.get(url, {
-      headers,
-      httpsAgent: agent,
-    });
-    return data;
-  } else {
-    const { data } = await axios.post(url, {}, {
-      headers,
-      httpsAgent: agent,
-    });
-    return data;
-  }
+  const { data } = await axios.post(url, {}, {
+    headers,
+    httpsAgent: agent,
+  });
+  return data;
 }
 
 // ─── List Summary — patrimônio + distribuição por instrumento ─────────────────
