@@ -98,17 +98,9 @@ export async function getAgoraToken(): Promise<string> {
 }
 
 export async function getAgoraHeaders(): Promise<Record<string, string>> {
-  const token   = await getAgoraToken();
-  const cpfcnpj = process.env.AGORA_CPFCNPJ_CHAVE;
-
-  const headers: Record<string, string> = {
+  const token = await getAgoraToken();
+  return {
     Authorization: `Bearer ${token}`,
     'Content-Type': 'application/json',
   };
-
-  if (cpfcnpj) {
-    headers['cpfcnpj'] = cpfcnpj;
-  }
-
-  return headers;
 }
