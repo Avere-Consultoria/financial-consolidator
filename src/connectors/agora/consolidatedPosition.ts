@@ -12,9 +12,7 @@ import { getAgoraBaseUrl, getAgoraHeaders, getAgoraHttpsAgent } from './auth';
 const isProduction = () => process.env.AGORA_ENVIRONMENT === 'production';
 
 function getBasePath(): string {
-  return isProduction()
-    ? '/managers-portfolio-mgmt/v1/portfolio'
-    : '/managers-portfolio-mgmt/v1';
+  return '/managers-portfolio-mgmt/v1';
 }
 
 function mapInstrumentType(code: string): AssetClass {
