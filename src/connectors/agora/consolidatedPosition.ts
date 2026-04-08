@@ -83,9 +83,14 @@ export async function getAgoraConsolidatedPosition(
       },
     };
   } catch (err: any) {
+    logger.error('Ágora: erro detalhado', {
+      status: err?.response?.status,
+      data: JSON.stringify(err?.response?.data),
+      message: err?.message,
+    });
     throw new ConsolidatorError(
       'AGORA_CONSOLIDATED_ERROR',
-      `Erro ao buscar posição consolidada Ágora: ${err?.response?.data?.message ?? err.message}`,
+      `Erro ao buscar posição consolidada Ágora: ${JSON.stringify(err?.response?.data) ?? err.message}`,
       'AGORA',
       err?.response?.status ?? 502
     );
