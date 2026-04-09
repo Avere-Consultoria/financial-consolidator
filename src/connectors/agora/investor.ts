@@ -18,11 +18,11 @@ export async function getInvestorCode(cpfCnpj: string) {
     logger.info(`Ágora: Buscando código CBLC para o CPF/CNPJ ${cpfCnpj}`);
     
     // Método POST com body vazio {}, garantindo os headers
-    const { data } = await axios.post(url, {}, {
+    const { data } = await axios.post(url, null, {
       headers: {
-        ...headers,
-        'Content-Type': 'application/json',
+        Authorization: headers.Authorization, // Pega só o Bearer
         'Accept': 'application/json'
+        // REMOVIDO o Content-Type
       },
       httpsAgent: agent,
     });
