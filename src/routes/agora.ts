@@ -6,6 +6,7 @@ import {
 } from '../connectors/agora/consolidatedPosition';
 import { ConsolidatorError } from '../types';
 import { logger } from '../utils/logger';
+import { getInvestorCode } from '../connectors/agora/investor';
 
 const router = Router();
 
@@ -53,6 +54,21 @@ router.get('/position/:cpfCnpj/:accountCode/less-prev', async (req: Request, res
     const data = await getAgoraListSummaryLessPrev(cpfCnpj, accountCode);
     res.json({ success: true, data, meta: { fetchedAt: new Date().toISOString() } });
   } catch (err) { handleError(res, err); }
+});
+
+// GET /api/v1/agora/investor/:cpfCnpj
+router.get('/investor/:cpfCnpj', async (req: Request, res: Response) => {
+  try {
+    const { cpfCnpj } = req.params;
+    
+    // Limpeza para garantir apenas números
+    const cleanCpf = cpfCnpj.replace(/\D/g, '');
+
+    const data = await getInvestorCode(cleanCpf);
+    res.json({ success: true, data, meta: { fetchedAt: new Date().toISOString() } });
+  } catch (err) { 
+    handleError(res, err); 
+  }
 });
 
 export default router;
