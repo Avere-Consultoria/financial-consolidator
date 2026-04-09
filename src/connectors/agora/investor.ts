@@ -19,16 +19,15 @@ export async function getInvestorCode(cpfCnpj: string) {
     
     // Passamos a configuração inteira no Axios, OMITINDO a propriedade 'data'
     const { data } = await axios({
-      method: 'post',
-      url: url,
-      httpsAgent: agent,
-      headers: {
-        Authorization: headers.Authorization, // Apenas o Bearer Token
-        'Accept': 'application/json'
-        // SEM Content-Type e SEM data (body)
-      }
-    });
-    
+  method: 'post',
+  url: url,
+  httpsAgent: agent,
+  headers: {
+    Authorization: headers.Authorization,
+    'Accept': 'application/json',
+    'Content-Length': '0' // <- Adicione esta linha
+  }
+});
     return data;
   } catch (err: any) {
     logger.error('Ágora: erro ao buscar código do investidor', {
