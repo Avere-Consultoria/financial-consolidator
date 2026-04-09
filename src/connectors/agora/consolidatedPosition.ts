@@ -31,16 +31,18 @@ function mapInstrumentType(code: string): AssetClass {
   };
   return map[code] ?? 'OTHER';
 }
-
 async function agoraRequest(path: string): Promise<any> {
   const url = `${getAgoraBaseUrl()}${path}`;
   const headers = await getAgoraHeaders();
   const agent = getAgoraHttpsAgent();
 
-  logger.info(`Ágora: chamando URL: ${url}`);
-
-  const { data } = await axios.get(url, {
-    headers,
+  // O axios.post precisa de 3 argumentos: URL, DATA (Corpo), CONFIG (Headers/Agent)
+  const { data } = await axios.post(url, {}, { 
+    headers: {
+      ...headers,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    },
     httpsAgent: agent,
   });
   return data;

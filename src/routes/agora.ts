@@ -27,8 +27,13 @@ function handleError(res: Response, err: unknown) {
 router.get('/position/:cpfCnpj/:accountCode', async (req: Request, res: Response) => {
   try {
     const { cpfCnpj, accountCode } = req.params;
-    const data = await getAgoraConsolidatedPosition(cpfCnpj, accountCode);
-    res.json({ success: true, data, meta: { fetchedAt: new Date().toISOString() } });
+    
+    // Limpeza para garantir apenas números (exigência da API Ágora)
+    const cleanCpf = cpfCnpj.replace(/\D/g, '');
+    const cleanAccount = accountCode.replace(/\D/g, '');
+
+    const data = await getAgoraConsolidatedPosition(cleanCpf, cleanAccount);
+    res.json({ success: true, data });
   } catch (err) { handleError(res, err); }
 });
 
