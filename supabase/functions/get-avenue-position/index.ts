@@ -36,11 +36,11 @@ Deno.serve(async (req) => {
     if (!cliente?.codigo_avenue) throw new Error('Código Avenue não encontrado no banco')
 
     // Volte alguns dias para garantir que a Avenue já fechou a custódia
-const dateObj = new Date();
-dateObj.setDate(dateObj.getDate() - 4); // Voltando 4 dias para garantir o teste de hoje
-const targetDate = dateObj.toISOString().split('T')[0];
+      const dateObj = new Date();
+      dateObj.setDate(dateObj.getDate() - 4); // Voltando 4 dias para garantir o teste de hoje
+      const targetDate = dateObj.toISOString().split('T')[0];
 
-const fetchUrl = `${CONSOLIDATOR_URL}/api/v1/avenue/auc?date=${targetDate}&cpf=${cliente.codigo_avenue}`;
+      const fetchUrl = `${CONSOLIDATOR_URL}/api/v1/avenue/auc?date=${targetDate}&cpf=${cliente.codigo_avenue}`;
 
     // O pulo do gato: tentar o fetch e capturar se a rede cair
     let response;
