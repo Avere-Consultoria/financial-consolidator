@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
     const today = new Date().toISOString().split('T')[0]
     
     // A Rota Mágica que configuramos no Express
-    const fetchUrl = `https://financial-consolidator-production.up.railway.app/api/v1/avenue/auc?date=${today}&cpf=${cliente.codigo_avenue}`;
+    const fetchUrl = `${CONSOLIDATOR_URL}/api/v1/avenue/auc?date=${today}&cpf=${cliente.codigo_avenue}`;
     console.log("Atirando para:", fetchUrl)
 
     // O pulo do gato: tentar o fetch e capturar se a rede cair
