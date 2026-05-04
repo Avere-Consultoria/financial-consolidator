@@ -1,4 +1,4 @@
-import { Router, Request, Response, NextFunction } from 'express';
+import { Router, Request, Response } from 'express';
 import { getAvenueActiveClients } from '../connectors/avenue/activeClients';
 import { getAvenueAuc } from '../connectors/avenue/auc';
 import { getAvenueCashBalance } from '../connectors/avenue/cashBalance';
@@ -12,9 +12,9 @@ import { logger } from '../utils/logger';
 
 const router = Router();
 
-// Helpers
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 function getDateParam(req: Request): string {
-  // Aceita ?date=YYYY-MM-DD ou usa hoje como default
   const raw = req.query.date as string | undefined;
   if (raw) return raw;
   return new Date().toISOString().split('T')[0];
@@ -44,14 +44,16 @@ router.get('/active-clients', async (req: Request, res: Response) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GET /avenue/auc?date=YYYY-MM-DD
-// Custódia (Assets Under Custody) por produto e cliente na data informada
+// GET /avenue/auc?date=YYYY-MM-DD&cpf=XXX
+// Custódia por produto e cliente na data informada
+// ?cpf é opcional — se informado, filtra apenas os ativos daquele cliente
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/auc', async (req: Request, res: Response) => {
   try {
     const date = getDateParam(req);
-    const data = await getAvenueAuc(date);
-    return res.json({ source: 'AVENUE', date, count: data.length, data });
+    const cpf = req.query.cpf as string | undefined;
+    const data = await getAvenueAuc(date, cpf);
+    return res.json({ source: 'AVENUE', date, cpf: cpf ?? null, count: data.length, data });
   } catch (err) {
     return handleError(err, res);
   }

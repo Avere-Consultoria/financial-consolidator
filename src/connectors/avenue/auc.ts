@@ -7,6 +7,7 @@ import { logger } from '../../utils/logger';
 // Avenue — AUC (Assets Under Custody)
 // POST /api/4.0/queries/run/json
 // Custódia somada por produto, ativo, cliente e data
+// Filtro por CPF opcional — se informado, retorna apenas os ativos daquele cliente
 // ─────────────────────────────────────────────────────────────────────────────
 
 const BASE_URL = 'https://avenueanalytics.cloud.looker.com/api/4.0';
@@ -32,11 +33,14 @@ export interface AvenueAucEntry {
   isin: string | null;
 }
 
-export async function getAvenueAuc(date: string): Promise<AvenueAucEntry[]> {
+export async function getAvenueAuc(date: string, cpf?: string): Promise<AvenueAucEntry[]> {
   const token = await getAvenueToken();
 
+  const filters: Record<string, string> = { 'auc.date': date };
+  if (cpf) filters['auc.client_cpf'] = cpf;
+
   try {
-    logger.info(`Avenue: buscando AUC para ${date}`);
+    logger.info(`Avenue: buscando AUC para ${date}${cpf ? ` | CPF: ${cpf}` : ''}`);
 
     const response = await axios.post(
       `${BASE_URL}/queries/run/json`,
@@ -63,7 +67,7 @@ export async function getAvenueAuc(date: string): Promise<AvenueAucEntry[]> {
           'auc.maturity_date',
           'auc.isin',
         ],
-        filters: { 'auc.date': date },
+        filters,
         limit: -1,
       },
       {
@@ -76,7 +80,7 @@ export async function getAvenueAuc(date: string): Promise<AvenueAucEntry[]> {
     const status = err?.response?.status;
     const data = err?.response?.data;
 
-    logger.error('Avenue: erro ao buscar AUC', { date, status, data });
+    logger.error('Avenue: erro ao buscar AUC', { date, cpf, status, data });
 
     if (status === 401) {
       throw new ConsolidatorError('AVENUE_UNAUTHORIZED', 'Token Avenue inválido ou expirado', 'AVENUE', 401);
