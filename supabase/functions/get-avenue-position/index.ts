@@ -35,10 +35,10 @@ Deno.serve(async (req) => {
 
     const today = new Date().toISOString().split('T')[0]
     
-    // 4. Chamada para o Railway
-    const fetchUrl = `${CONSOLIDATOR_URL}/api/v1/avenue/auc?date=${today}&cpf=${cliente.codigo_avenue}`;
+    // Na sua Edge Function, mude a montagem da URL para:
+const fetchUrl = `${CONSOLIDATOR_URL}/api/v1/avenue/auc?date=${today}&cpf=${cliente.codigo_avenue}`;
 
-console.log("Chamando Railway no endereço:", fetchUrl);
+console.log("Chamando Railway em:", fetchUrl);
 
 const response = await fetch(fetchUrl, { 
   method: 'GET', 
