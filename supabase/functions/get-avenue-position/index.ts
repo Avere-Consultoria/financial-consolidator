@@ -25,27 +25,24 @@ Deno.serve(async (req) => {
     const { clientId } = await req.json()
     if (!clientId) throw new Error('clientId é obrigatório')
 
-    // 4. Busca o código da Avenue que acabamos de adicionar na tabela 'clientes'
-    const { data: cliente, error: cliError } = await supabase
-      .from('clientes')
-      .select('codigo_avenue')
-      .eq('id', clientId)
-      .single()
+    // 4. Busca o codigo_avenue (CPF) na tabela 'clientes'
+const { data: cliente, error: cliError } = await supabase
+  .from('clientes')
+  .select('codigo_avenue')
+  .eq('id', clientId)
+  .single()
 
-    if (cliError || !cliente?.codigo_avenue) {
-      throw new Error('Código Avenue não encontrado para este cliente no banco.')
-    }
+if (cliError || !cliente?.codigo_avenue) {
+  throw new Error('Código Avenue não encontrado para este cliente.')
+}
 
-    console.log(`Buscando posição Avenue para conta: ${cliente.codigo_avenue}`)
+// 5. Monta a data de hoje e chama o endpoint correto
+const today = new Date().toISOString().split('T')[0]
 
-    // 5. Chama o seu back-end de integração (financial-consolidator)
-    const response = await fetch(
-      `${CONSOLIDATOR_URL}/api/v1/position/avenue/${cliente.codigo_avenue}`,
-      { 
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' } 
-      }
-    )
+const response = await fetch(
+  `${CONSOLIDATOR_URL}/avenue/auc?date=${today}&cpf=${cliente.codigo_avenue}`,
+  { method: 'GET', headers: { 'Content-Type': 'application/json' } }
+)
 
     const rawJson = await response.json()
 
