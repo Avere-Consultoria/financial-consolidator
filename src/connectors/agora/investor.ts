@@ -25,7 +25,7 @@ export async function getInvestorCode(cpfCnpj: string) {
   headers: {
     Authorization: headers.Authorization,
     'Accept': 'application/json',
-    'Content-Length': '0' // <- Adicione esta linha
+    'Content-Length': '0'
   }
 });
     return data;
