@@ -1,5 +1,6 @@
 import { getBtgPosition } from '../connectors/btg/position';
 import { getXpPosition } from '../connectors/xp/position';
+import { getAvenuePosition } from '../connectors/avenue/position';
 import { cacheService } from '../cache';
 import { logger } from '../utils/logger';
 import {
@@ -35,6 +36,9 @@ export async function getPositionByInstitution(
       break;
     case 'XP':
       position = await getXpPosition(accountNumber);
+      break;
+      case 'AVENUE': // <-- Adicionado!
+      position = await getAvenuePosition(accountNumber);
       break;
     default:
       throw new ConsolidatorError('UNKNOWN_INSTITUTION', `Instituição desconhecida: ${institution}`, undefined, 400);
