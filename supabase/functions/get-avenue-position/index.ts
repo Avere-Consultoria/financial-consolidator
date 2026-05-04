@@ -33,9 +33,10 @@ Deno.serve(async (req) => {
 
     if (!cliente?.codigo_avenue) throw new Error('Código Avenue não encontrado no banco')
 
-    const today = new Date().toISOString().split('T')[0]
-    
-    // Na sua Edge Function, mude a montagem da URL para:
+    // Dentro do seu Deno.serve no Supabase
+const today = new Date().toISOString().split('T')[0];
+
+// A URL de Ouro!
 const fetchUrl = `${CONSOLIDATOR_URL}/api/v1/avenue/auc?date=${today}&cpf=${cliente.codigo_avenue}`;
 
 console.log("Chamando Railway em:", fetchUrl);
