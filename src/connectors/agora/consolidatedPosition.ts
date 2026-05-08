@@ -105,7 +105,7 @@ export async function getAgoraConsolidatedPosition(
       institution: 'AGORA',
       accountNumber: accountCode,
       positionDate: data?.referenceDate ?? new Date().toISOString(),
-      totalAmount: data?.totalGrossPatrimony ?? data?.valuePatrimonyTotalGross ?? 0,
+      totalAmount: data?.totalGrossPatrimony ?? data?.valuePatrimonyTotalGross ?? assets.reduce((sum, a) => sum + (a.grossValue ?? 0), 0),
       currency: 'BRL',
       assets,
       rawMeta: {
