@@ -99,8 +99,11 @@ export async function getAgoraToken(): Promise<string> {
 
 export async function getAgoraHeaders(): Promise<Record<string, string>> {
   const token = await getAgoraToken();
+  const cpfcnpj = process.env.AGORA_CPFCNPJ_CHAVE;
+
   return {
     Authorization: `Bearer ${token}`,
     'Accept': 'application/json',
+    ...(cpfcnpj && { cpfcnpj }),
   };
 }
