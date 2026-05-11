@@ -58,6 +58,10 @@ export async function getAgoraConsolidatedPosition(
       `${getBasePath()}/listsummary/${cpfCnpj}/${accountCode}`
     );
 
+    // 🚩 INSIRA OS LOGS AQUI PARA VER O QUE O BRADESCO MANDOU:
+    logger.info("=== DEBUG DATA BRUTA ===");
+    logger.info(JSON.stringify(data));
+
     // Sandbox retorna "allocation", produção retorna "result.products"
     const allocation = data?.allocation ?? {};
     const products = data?.result?.products ?? {};
