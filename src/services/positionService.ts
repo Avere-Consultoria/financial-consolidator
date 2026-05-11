@@ -23,7 +23,8 @@ const CACHE_TTL = 300; // 5 minutos — respeita os limites de rate das APIs
 
 export async function getPositionByInstitution(
   institution: Institution,
-  accountNumber: string
+  accountNumber: string,
+  cpf?: string // CPF opcional aqui
 ): Promise<UnifiedPosition> {
   const cacheKey = `position:${institution}:${accountNumber}`;
   const cached = cacheService.get<UnifiedPosition>(cacheKey);
