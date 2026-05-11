@@ -1,104 +1,86 @@
+// get-agora-position/index.ts
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
 }
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    )
-
+    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
     const { cpfCnpj, accountCode, clientId } = await req.json()
-    
-    // 1. Chamar API do Bradesco (ajuste a URL conforme seu ambiente)
+
+    console.log(`🚀 Iniciando busca Ágora para cliente: ${clientId} (CPF: ${cpfCnpj})`)
+
     const AGORA_URL = `https://openapi.bradesco.com.br/managers-portfolio-mgmt/v1/listsummary/${cpfCnpj}/${accountCode}`
+    const response = await fetch(AGORA_URL)
     
-    const response = await fetch(AGORA_URL, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-    })
+    if (!response.ok) throw new Error(`API Bradesco erro: ${response.status}`)
 
     const rawData = await response.json()
-    const result = rawData.result // A chave principal do Bradesco
+    const result = rawData.result
+    
+    if (!result) throw new Error("Chave 'result' não encontrada no JSON do Bradesco")
 
-    if (!result) throw new Error("Resposta da Ágora não contém a chave 'result'")
+    console.log("✅ Dados recebidos da Ágora. Iniciando persistência...")
 
-    // 2. Extrair saldos das categorias
     const p = result.products || {}
-    const saldo_caixa  = p.cc?.grossPatrimony || 0
-    const saldo_rv     = p.rv?.grossPatrimony || 0
-    const saldo_rf     = p.tpv?.grossPatrimony || 0
-    const saldo_fundos = p.fun?.grossPatrimony || 0
-    const saldo_outros = p.pvd?.grossPatrimony || 0 // Previdência como outros
-
     const patrimonio_total = result.valuePatrimonyTotalGross || 0
     const targetDate = new Date().toISOString().split('T')[0]
 
-    // 3. Salvar Snapshot
+    // SALVAR SNAPSHOT
     const { data: snapshot, error: snapError } = await supabase
       .from('posicao_agora_snapshots')
       .upsert({
         cliente_id: clientId,
         data_referencia: targetDate,
         patrimonio_total,
-        saldo_caixa,
-        saldo_rf,
-        saldo_rv,
-        saldo_fundos,
-        saldo_outros,
+        saldo_caixa: p.cc?.grossPatrimony || 0,
+        saldo_rf: p.tpv?.grossPatrimony || 0,
+        saldo_rv: p.rv?.grossPatrimony || 0,
+        saldo_fundos: p.fun?.grossPatrimony || 0,
+        saldo_outros: p.pvd?.grossPatrimony || 0,
         source: 'BRADESCO_OPEN_API'
       }, { onConflict: 'cliente_id,data_referencia' })
-      .select('id')
-      .single()
+      .select('id').single()
 
-    if (snapError) throw snapError
-
-    // 4. Mapear Categorias como "Ativos" para preencher a tabela
-    // Nota: O endpoint 'listsummary' não traz papel por papel, apenas os totais por classe.
-    // Vamos salvar as classes como se fossem ativos para a tabela não ficar vazia.
-    const ativosParaSalvar = Object.values(p).filter((item: any) => item.grossPatrimony > 0).map((item: any) => ({
-      snapshot_id: snapshot.id,
-      tipo: item.description,
-      sub_tipo: item.instrumentType,
-      emissor: 'Ágora Investimentos',
-      ticker: item.instrumentType,
-      valor_bruto: item.grossPatrimony,
-      valor_liquido: item.liquidPatrimony,
-      quantidade: 1
-    }))
-
-    await supabase.from('posicao_agora_ativos').delete().eq('snapshot_id', snapshot.id)
-    if (ativosParaSalvar.length > 0) {
-      await supabase.from('posicao_agora_ativos').insert(ativosParaSalvar)
+    if (snapError) {
+      console.error("❌ Erro ao salvar snapshot:", snapError.message)
+      throw snapError
     }
 
-    return new Response(JSON.stringify({
-      patrimonioTotal: patrimonio_total,
-      dataReferencia: targetDate,
-      alocacao: [
-        { classe: 'Caixa', valor: saldo_caixa },
-        { classe: 'Renda Fixa', valor: saldo_rf },
-        { classe: 'Renda Variável', valor: saldo_rv },
-        { classe: 'Fundos', valor: saldo_fundos },
-        { classe: 'Previdência', valor: saldo_outros },
-      ].filter(a => a.valor > 0),
-      ativos: ativosParaSalvar // Retorna para o front exibir na hora
-    }), { 
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200 
+    console.log(`✅ Snapshot salvo (ID: ${snapshot.id}). Mapeando ativos...`)
+
+    // SALVAR ATIVOS
+    const ativosParaSalvar = Object.values(p)
+      .filter((item: any) => item.grossPatrimony > 0)
+      .map((item: any) => ({
+        snapshot_id: snapshot.id,
+        tipo: item.description,
+        sub_tipo: item.instrumentType,
+        emissor: 'Ágora Investimentos',
+        ticker: item.instrumentType,
+        valor_bruto: item.grossPatrimony,
+        valor_liquido: item.liquidPatrimony,
+        quantidade: 1
+      }))
+
+    await supabase.from('posicao_agora_ativos').delete().eq('snapshot_id', snapshot.id)
+    const { error: insError } = await supabase.from('posicao_agora_ativos').insert(ativosParaSalvar)
+    
+    if (insError) console.error("❌ Erro ao inserir ativos:", insError.message)
+
+    console.log(`🎯 Sucesso! ${ativosParaSalvar.length} registros processados.`)
+
+    return new Response(JSON.stringify({ success: true, patrimonioTotal: patrimonio_total }), { 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     })
 
   } catch (err: any) {
-    return new Response(JSON.stringify({ error: err.message }), { 
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 400 
-    })
+    console.error("🔥 FALHA CRÍTICA:", err.message)
+    return new Response(JSON.stringify({ error: err.message }), { status: 400, headers: corsHeaders })
   }
 })
