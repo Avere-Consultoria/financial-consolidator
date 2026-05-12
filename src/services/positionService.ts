@@ -17,7 +17,15 @@ import {
 // Orquestra as chamadas ao BTG e XP, aplica cache e consolida os dados
 // ─────────────────────────────────────────────────────────────────────────────
 
-const CACHE_TTL = 300; // 5 minutos — respeita os limites de rate das APIs
+// TTLs de posição por instituição (segundos)
+// Avenue usa dados D-4: não mudam intraday, cache longo é seguro
+const POSITION_TTL: Record<Institution, number> = {
+  BTG:    300,   // 5 min
+  XP:     300,   // 5 min
+  AGORA:  300,   // 5 min
+  AVENUE: 3600,  // 1 hora — dado é D-4, estável durante o dia
+};
+const CONSOLIDATED_TTL = 300; // 5 min
 
 // ── Buscar posição de uma conta em uma instituição específica ─────────────────
 
@@ -51,7 +59,7 @@ export async function getPositionByInstitution(
       throw new ConsolidatorError('UNKNOWN_INSTITUTION', `Instituição desconhecida: ${institution}`, undefined, 400);
   }
 
-  cacheService.set(cacheKey, position, CACHE_TTL);
+  cacheService.set(cacheKey, position, POSITION_TTL[institution]);
   return position;
 }
 
@@ -59,7 +67,8 @@ export async function getPositionByInstitution(
 
 export async function getConsolidatedPosition(
   accountNumber: string,
-  institutions: Institution[] = ['BTG', 'XP']
+  institutions: Institution[] = ['BTG', 'XP'],
+  cpf?: string
 ): Promise<ConsolidatedPosition> {
   const cacheKey = `consolidated:${institutions.join('+')}:${accountNumber}`;
   const cached = cacheService.get<ConsolidatedPosition>(cacheKey);
@@ -69,7 +78,7 @@ export async function getConsolidatedPosition(
 
   // Busca em paralelo — falhas parciais não bloqueiam o retorno
   const results = await Promise.allSettled(
-    institutions.map((inst) => getPositionByInstitution(inst, accountNumber))
+    institutions.map((inst) => getPositionByInstitution(inst, accountNumber, cpf))
   );
 
   const positions: UnifiedPosition[] = [];
@@ -97,7 +106,7 @@ export async function getConsolidatedPosition(
   }
 
   const consolidated = buildConsolidated(accountNumber, positions);
-  cacheService.set(cacheKey, consolidated, CACHE_TTL);
+  cacheService.set(cacheKey, consolidated, CONSOLIDATED_TTL);
 
   return consolidated;
 }

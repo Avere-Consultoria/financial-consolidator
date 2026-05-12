@@ -1,12 +1,12 @@
 import { Router, Request, Response } from 'express';
 import {
-  getAgoraConsolidatedPosition,
   getAgoraSummary,
   getAgoraListSummaryLessPrev,
 } from '../connectors/agora/consolidatedPosition';
 import { ConsolidatorError } from '../types';
 import { logger } from '../utils/logger';
 import { getInvestorCode } from '../connectors/agora/investor';
+import { parseCpfCnpj } from '../utils/validation';
 
 const router = Router();
 
@@ -24,25 +24,13 @@ function handleError(res: Response, err: unknown) {
   });
 }
 
-// GET /api/v1/agora/position/:cpfCnpj/:accountCode
-router.get('/position/:cpfCnpj/:accountCode', async (req: Request, res: Response) => {
-  try {
-    const { cpfCnpj, accountCode } = req.params;
-    
-    // Limpeza para garantir apenas números (exigência da API Ágora)
-    const cleanCpf = cpfCnpj.replace(/\D/g, '');
-    const cleanAccount = accountCode.replace(/\D/g, '');
-
-    const data = await getAgoraConsolidatedPosition(cleanCpf, cleanAccount);
-    res.json({ success: true, data });
-  } catch (err) { handleError(res, err); }
-});
-
 // GET /api/v1/agora/position/:cpfCnpj/:accountCode/summary
 router.get('/position/:cpfCnpj/:accountCode/summary', async (req: Request, res: Response) => {
   try {
     const { cpfCnpj, accountCode } = req.params;
-    const data = await getAgoraSummary(cpfCnpj, accountCode);
+    const cleanCpf = parseCpfCnpj(cpfCnpj, 'cpfCnpj');
+    const cleanAccount = accountCode.replace(/\D/g, '');
+    const data = await getAgoraSummary(cleanCpf, cleanAccount);
     res.json({ success: true, data, meta: { fetchedAt: new Date().toISOString() } });
   } catch (err) { handleError(res, err); }
 });
@@ -51,7 +39,9 @@ router.get('/position/:cpfCnpj/:accountCode/summary', async (req: Request, res: 
 router.get('/position/:cpfCnpj/:accountCode/less-prev', async (req: Request, res: Response) => {
   try {
     const { cpfCnpj, accountCode } = req.params;
-    const data = await getAgoraListSummaryLessPrev(cpfCnpj, accountCode);
+    const cleanCpf = parseCpfCnpj(cpfCnpj, 'cpfCnpj');
+    const cleanAccount = accountCode.replace(/\D/g, '');
+    const data = await getAgoraListSummaryLessPrev(cleanCpf, cleanAccount);
     res.json({ success: true, data, meta: { fetchedAt: new Date().toISOString() } });
   } catch (err) { handleError(res, err); }
 });
@@ -60,14 +50,11 @@ router.get('/position/:cpfCnpj/:accountCode/less-prev', async (req: Request, res
 router.get('/investor/:cpfCnpj', async (req: Request, res: Response) => {
   try {
     const { cpfCnpj } = req.params;
-    
-    // Limpeza para garantir apenas números
-    const cleanCpf = cpfCnpj.replace(/\D/g, '');
-
+    const cleanCpf = parseCpfCnpj(cpfCnpj, 'cpfCnpj');
     const data = await getInvestorCode(cleanCpf);
     res.json({ success: true, data, meta: { fetchedAt: new Date().toISOString() } });
-  } catch (err) { 
-    handleError(res, err); 
+  } catch (err) {
+    handleError(res, err);
   }
 });
 

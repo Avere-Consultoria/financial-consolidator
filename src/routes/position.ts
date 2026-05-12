@@ -6,6 +6,9 @@ import {
 import { cacheService } from '../cache';
 import { ApiResponse, Institution, ConsolidatorError } from '../types';
 import { logger } from '../utils/logger';
+import { getAgoraConsolidatedPosition } from '../connectors/agora/consolidatedPosition';
+import { getAvenuePosition } from '../connectors/avenue/position';
+import { parseCpfCnpj } from '../utils/validation';
 
 const router = Router();
 
@@ -50,6 +53,59 @@ router.get('/xp/:accountNumber', async (req: Request, res: Response) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// GET /api/v1/position/agora/:cpfCnpj/:accountCode
+// Posição de uma conta na Ágora (Bradesco)
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/agora/:cpfCnpj/:accountCode', async (req: Request, res: Response) => {
+  const { cpfCnpj, accountCode } = req.params;
+  let cleanCpf: string;
+  try {
+    cleanCpf = parseCpfCnpj(cpfCnpj, 'cpfCnpj');
+  } catch (err) {
+    return handleError(err, res, 'AGORA');
+  }
+  const cleanAccount = accountCode.replace(/\D/g, '');
+
+  try {
+    const data = await getAgoraConsolidatedPosition(cleanCpf, cleanAccount);
+    const response: ApiResponse<typeof data> = {
+      success: true,
+      data,
+      meta: { fetchedAt: new Date().toISOString() },
+    };
+    return res.json(response);
+  } catch (err) {
+    return handleError(err, res, 'AGORA');
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/v1/position/avenue/:cpf
+// Posição de um cliente na Avenue (D-4)
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/avenue/:cpf', async (req: Request, res: Response) => {
+  const { cpf } = req.params;
+  let cleanCpf: string;
+  try {
+    cleanCpf = parseCpfCnpj(cpf, 'cpf');
+  } catch (err) {
+    return handleError(err, res, 'AVENUE');
+  }
+
+  try {
+    const data = await getAvenuePosition(cleanCpf);
+    const response: ApiResponse<typeof data> = {
+      success: true,
+      data,
+      meta: { fetchedAt: new Date().toISOString() },
+    };
+    return res.json(response);
+  } catch (err) {
+    return handleError(err, res, 'AVENUE');
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // GET /api/v1/position/consolidated/:accountNumber
 // Posição consolidada de múltiplas instituições
 // Query param: ?institutions=BTG,XP (padrão: todas)
@@ -57,13 +113,23 @@ router.get('/xp/:accountNumber', async (req: Request, res: Response) => {
 router.get('/consolidated/:accountNumber', async (req: Request, res: Response) => {
   const { accountNumber } = req.params;
   const institutionsParam = req.query.institutions as string | undefined;
+  const cpfRaw = req.query.cpf as string | undefined;
 
   const institutions: Institution[] = institutionsParam
     ? (institutionsParam.split(',').map((i) => i.trim().toUpperCase()) as Institution[])
     : ['BTG', 'XP'];
 
+  let cpf: string | undefined;
+  if (cpfRaw) {
+    try {
+      cpf = parseCpfCnpj(cpfRaw, 'cpf');
+    } catch (err) {
+      return handleError(err, res);
+    }
+  }
+
   try {
-    const data = await getConsolidatedPosition(accountNumber, institutions);
+    const data = await getConsolidatedPosition(accountNumber, institutions, cpf);
     const response: ApiResponse<typeof data> = {
       success: true,
       data,

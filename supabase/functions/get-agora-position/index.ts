@@ -18,9 +18,9 @@ Deno.serve(async (req) => {
     const { cpfCnpj, accountCode, clientId } = await req.json()
     const CONSOLIDATOR_URL = Deno.env.get('CONSOLIDATOR_URL')
     
-    const response = await fetch(`${CONSOLIDATOR_URL}/api/v1/agora/listsummary/${cpfCnpj}/${accountCode}`)
+    const response = await fetch(`${CONSOLIDATOR_URL}/api/v1/position/agora/${cpfCnpj}/${accountCode}`)
     const payload = await response.json()
-    const data = payload.data || payload 
+    const data = payload.data || payload
 
     if (!data.totalAmount) throw new Error("Railway não retornou patrimônio.")
 

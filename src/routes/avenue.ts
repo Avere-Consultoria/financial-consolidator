@@ -4,6 +4,7 @@ import { getAvenueAuc } from '../connectors/avenue/auc';
 import { getAvenueCashBalance } from '../connectors/avenue/cashBalance';
 import { ConsolidatorError } from '../types';
 import { logger } from '../utils/logger';
+import { parseCpfCnpj } from '../utils/validation';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Avenue Routes
@@ -51,7 +52,8 @@ router.get('/active-clients', async (req: Request, res: Response) => {
 router.get('/auc', async (req: Request, res: Response) => {
   try {
     const date = getDateParam(req);
-    const cpf = req.query.cpf as string | undefined;
+    const cpfRaw = req.query.cpf as string | undefined;
+    const cpf = cpfRaw ? parseCpfCnpj(cpfRaw, 'cpf') : undefined;
     const data = await getAvenueAuc(date, cpf);
     return res.json({ source: 'AVENUE', date, cpf: cpf ?? null, count: data.length, data });
   } catch (err) {
