@@ -24,7 +24,7 @@ export async function getXpPosition(accountNumber: string): Promise<UnifiedPosit
 
     // ── Posição Consolidada ──────────────────────────────────────────────────
     const response = await axios.get(
-      `${baseUrl}/data-access/api/v1/consolidated-position`,
+      `${baseUrl}/data-access/api/v1/consolidated-positions/customer/${accountNumber}`,
       {
         httpsAgent: agent,
         headers: {
