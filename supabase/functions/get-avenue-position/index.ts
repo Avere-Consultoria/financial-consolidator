@@ -54,19 +54,14 @@ Deno.serve(async (req) => {
     }
 
     const rawJson = await response.json()
-    
-    // Ajuste para lidar com diferentes formatos de retorno (array direto ou dentro de .data)
-    const aucData: any[] = Array.isArray(rawJson) ? rawJson : (Array.isArray(rawJson.data) ? rawJson.data : [])
 
-    console.log(`Recebidos ${aucData.length} ativos totais da API.`)
+    // A API retorna { data: AvenueAucEntry[] } — já filtrado pelo CPF passado na query
+    const aucData: any[] = Array.isArray(rawJson.data) ? rawJson.data : []
 
-    // 4. FILTRO DE SEGURANÇA: Filtra apenas os ativos do CPF solicitado
-    const filteredData = aucData.filter(item => item["auc.client_cpf"] === cliente.codigo_avenue)
-    
-    console.log(`Processando ${filteredData.length} ativos para o CPF ${cliente.codigo_avenue}`)
+    console.log(`Processando ${aucData.length} ativos para o CPF ${cliente.codigo_avenue}`)
 
     // 5. Parsear ativos
-    const parsed = filteredData.map((item) => parseAtivoAvenue(item))
+    const parsed = aucData.map((item) => parseAtivoAvenue(item))
 
     // 6. Calcular Totais para o Snapshot
     const totais = calcularTotais(parsed)
@@ -133,43 +128,42 @@ Deno.serve(async (req) => {
 // Funções Auxiliares
 // ─────────────────────────────────────────────────────────────────────────────
 
+// item é AvenueAucEntry (propriedades camelCase mapeadas pelo consolidador)
 function parseAtivoAvenue(item: any) {
-  const productType = item["auc.product_type"] || ''
-  const assetClass = classificarProductType(productType)
-  const tipoLabel  = mapTipoLabel(assetClass)
+  const productType = item.productType || ''
+  const assetClass  = classificarProductType(productType)
+  const tipoLabel   = mapTipoLabel(assetClass)
   const isLiquidity = productType.includes('Balance')
 
-  // Mapeamento para o Banco de Dados (snake_case)
   const dbRow = {
-    asset_class:      assetClass,
-    tipo:             tipoLabel,
-    product_type:     productType,
-    nome:             item["auc.product_name"]   || null,
-    ticker:           item["auc.product_symbol"] || null,
-    quantidade:       item["auc.quantity"]       ?? null,
-    valor_bruto_brl:  item["auc.auc_brl"]        ?? 0,
-    valor_bruto_usd:  item["auc.auc_usd"]        ?? 0,
-    maturity_date:    item["auc.maturity_date"]  || null,
-    is_liquidity:     isLiquidity,
-    office_name:      item["auc.office_name"]    || null,
+    asset_class:     assetClass,
+    tipo:            tipoLabel,
+    product_type:    productType,
+    nome:            item.productName   || null,
+    ticker:          item.productSymbol || null,
+    quantidade:      item.quantity      ?? null,
+    valor_bruto_brl: item.aucBrl        ?? 0,
+    valor_bruto_usd: item.aucUsd        ?? 0,
+    maturity_date:   item.maturityDate  || null,
+    is_liquidity:    isLiquidity,
+    office_name:     item.officeName    || null,
   }
 
-  // Mapeamento para o Front-end (Padronizado com a UI)
   const frontRow = {
     tipo:         tipoLabel,
     subTipo:      productType,
-    emissor:      item["auc.product_name"]   || null,
-    ticker:       item["auc.product_symbol"] || null,
-    quantidade:   item["auc.quantity"]       ?? null,
-    valorBruto:   item["auc.auc_brl"]        ?? 0,
-    valorLiquido: item["auc.auc_brl"]        ?? 0,
-    valorUsd:     item["auc.auc_usd"]        ?? 0,
-    vencimento:   item["auc.maturity_date"]  || null,
+    emissor:      item.productName   || null,
+    ticker:       item.productSymbol || null,
+    quantidade:   item.quantity      ?? null,
+    valorBruto:   item.aucBrl        ?? 0,
+    valorLiquido: item.aucBrl        ?? 0,
+    valorUsd:     item.aucUsd        ?? 0,
+    vencimento:   item.maturityDate  || null,
     isLiquidity,
     extra: {
-        assetType: productType,
-        currency: 'USD'
-    }
+      assetType: productType,
+      currency:  'USD',
+    },
   }
 
   return { dbRow, frontRow }
