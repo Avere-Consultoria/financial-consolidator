@@ -39,6 +39,7 @@ export function getXpHttpsAgent(): https.Agent {
     return new https.Agent({
       cert: loadCert('XP_CERT_BASE64', 'XP_CERT_PATH'),
       key:  loadCert('XP_KEY_BASE64',  'XP_KEY_PATH'),
+      rejectUnauthorized: false, // ICP-Brasil não está na CA store do Node.js
     });
   } catch (err: any) {
     throw new ConsolidatorError(
