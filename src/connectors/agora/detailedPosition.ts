@@ -265,28 +265,39 @@ function mapTerm(items: any[]): UnifiedAsset[] {
   }));
 }
 
+// saleDate vem como inteiro DDMMYYYY (ex: 20062024 → "2024-06-20")
+function parsePensionDate(ddmmyyyy: number | string | undefined): string | undefined {
+  if (!ddmmyyyy) return undefined;
+  const s = String(ddmmyyyy).padStart(8, '0');
+  if (s.length !== 8) return undefined;
+  return `${s.slice(4, 8)}-${s.slice(2, 4)}-${s.slice(0, 2)}`;
+}
+
 function mapPension(items: any[]): UnifiedAsset[] {
-  return (items ?? []).map((p) => ({
-    assetClass: 'PENSION' as AssetClass,
-    name: p.planName ?? p.fundName ?? p.fundType ?? 'Previdência',
-    securityCode: p.cnpj,
-    grossValue: p.grossValue ?? p.totalValue ?? 0,
-    netValue: p.netValue,
-    costPrice: p.appliedValue ?? p.totalApplied,
-    acquisitionDate: p.startDate ?? p.contractDate,
-    extra: {
-      fundType: p.fundType,
-      planName: p.planName ?? p.fundName,
-      cnpj: p.cnpj,
-      taxRegime: p.taxRegime,
-      incomeType: p.incomeType,
-      startDate: p.startDate,
-      rentability: p.rentability != null ? parseFloat(p.rentability) : undefined,
-      iofValue: p.iofValue,
-      irValue: p.irValue,
-      status: p.status,
-    } satisfies AgoraPensionExtra,
-  }));
+  return (items ?? []).map((p) => {
+    const fundType = p.typePlan === 1 ? 'PGBL' : p.typePlan === 2 ? 'VGBL' : (p.planName ?? '').split(' ')[0];
+    const taxRegime = p.regime === 'R' ? 'Regressivo' : p.regime === 'P' ? 'Progressivo' : p.regime;
+
+    return {
+      assetClass: 'PENSION' as AssetClass,
+      name: p.planName ?? 'Previdência',
+      securityCode: String(p.planCod ?? ''),
+      grossValue: p.valueCurrentBalance ?? 0,
+      netValue: p.totalValueAvailable ?? p.valueCurrentBalance ?? 0,
+      acquisitionDate: parsePensionDate(p.saleDate),
+      extra: {
+        fundType,
+        planCod: String(p.planCod ?? ''),
+        proposedNumber: p.proposedNumber,
+        descriptionFund: p.descriptionFund,
+        taxRegime,
+        typePlan: p.typePlan,
+        totalValueAvailable: p.totalValueAvailable,
+        currentBalanceDate: parsePensionDate(p.currentBalanceDate),
+        nameParticipant: p.nameParticipant,
+      } satisfies AgoraPensionExtra,
+    };
+  });
 }
 
 // ─── Funções públicas por classe de ativo ────────────────────────────────────
@@ -381,7 +392,7 @@ export async function getDetailedPension(cpfCnpj: string): Promise<UnifiedAsset[
   try {
     logger.info(`Ágora: buscando previdência para CPF ${cpfCnpj}`);
     const data = await agoraGet(`/consolidatedposition/pension/${cpfCnpj}`);
-    return mapPension(extractArray(data, 'pension', 'pensions', 'plans'));
+    return mapPension(extractArray(data, 'proposals', 'pension', 'plans'));
   } catch (err: any) {
     throw new ConsolidatorError('AGORA_PENSION_ERROR', `Erro ao buscar previdência: ${err?.response?.data?.message ?? err.message}`, 'AGORA', err?.response?.status ?? 502);
   }
