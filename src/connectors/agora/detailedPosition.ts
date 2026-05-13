@@ -90,6 +90,7 @@ function mapFixedIncome(items: any[]): UnifiedAsset[] {
     name: p.bondName,
     securityCode: p.cetipSelicCode,
     quantity: p.bondQuantity,
+    marketPrice: p.bondUnitValue,             // preço unitário atual
     grossValue: p.grossValue ?? 0,
     netValue: p.netValue,
     costPrice: p.appliedValue,
@@ -103,6 +104,20 @@ function mapFixedIncome(items: any[]): UnifiedAsset[] {
       valueAppreciation: p.valueAppreciation,
       percentAppreciation: p.percentAppreciation,
       sourceCode: p.sourceCode,
+      // Taxa e precificação
+      bondRate: p.bondRate,
+      preTaxPercentage: p.preTaxPercentage,
+      bondUnitValue: p.bondUnitValue,
+      purchaseBondUnitValue: p.purchaseBondUnitValue,
+      // Impostos
+      bondTaxValue: p.bondTaxValue,
+      iofTaxValue: p.iofTaxValue,
+      bondTaxPercentage: p.bondTaxPercentage,
+      bondTaxDescription: p.bondTaxDescription,
+      // Outros
+      redeemType: p.redeemType,
+      guaranteeQuantity: p.guaranteeQuantity,
+      referenceDate: p.referenceDate,
     } satisfies AgoraFixedIncomeExtra,
   }));
 }

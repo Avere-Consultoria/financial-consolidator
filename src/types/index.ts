@@ -105,7 +105,21 @@ export interface AgoraFixedIncomeExtra {
   indexerPercentage?: number;
   valueAppreciation?: number;
   percentAppreciation?: number;
-  sourceCode?: string;
+  sourceCode?: number;
+  // Taxa e precificação
+  bondRate?: string;           // "11.4142% a.a." — string legível
+  preTaxPercentage?: number;   // 11.4142 — valor numérico da taxa
+  bondUnitValue?: number;      // preço unitário atual
+  purchaseBondUnitValue?: number; // preço unitário de compra
+  // Impostos
+  bondTaxValue?: number;       // valor do IR
+  iofTaxValue?: number;        // valor do IOF
+  bondTaxPercentage?: string;  // "15%"
+  bondTaxDescription?: string; // "Isento", "15%", etc.
+  // Outros
+  redeemType?: string;
+  guaranteeQuantity?: number;
+  referenceDate?: string;
 }
 
 export interface AgoraTreasuryExtra {
