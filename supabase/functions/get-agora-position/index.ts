@@ -108,8 +108,8 @@ Deno.serve(async (req) => {
             ir_percentual:       a.extra?.bondTaxPercentage || null,
             ir_descricao:        a.extra?.bondTaxDescription || null,
             // Datas
-            data_vencimento:     a.maturityDate ? a.maturityDate.split('T')[0] : null,
-            data_aplicacao:      a.acquisitionDate ? a.acquisitionDate.split('T')[0] : null,
+            data_vencimento:     a.maturityDate ? String(a.maturityDate).split('T')[0] : null,
+            data_aplicacao:      a.acquisitionDate ? String(a.acquisitionDate).split('T')[0] : null,
             // Flags
             liquidez_diaria:     a.isLiquidity ?? false,
         }))
@@ -123,9 +123,10 @@ Deno.serve(async (req) => {
     })
 
   } catch (err: any) {
-    return new Response(JSON.stringify({ error: err.message }), { 
-        status: 400, 
-        headers: corsHeaders 
+    console.error("ERRO GERAL:", err.message, err.stack)
+    return new Response(JSON.stringify({ error: err.message }), {
+        status: 400,
+        headers: corsHeaders
     })
   }
 })

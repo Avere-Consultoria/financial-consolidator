@@ -14,6 +14,7 @@ import {
   AgoraFutureExtra,
   AgoraBtcExtra,
   AgoraTermExtra,
+  AgoraPensionExtra,
 } from '../../types';
 import { getAgoraBaseUrl, getAgoraHeaders, getAgoraHttpsAgent } from './auth';
 
@@ -129,7 +130,7 @@ function mapTreasuryDirect(items: any[]): UnifiedAsset[] {
     quantity: p.bondQuantity,
     grossValue: p.positionValue ?? p.vlGross ?? 0,
     costPrice: p.vlAplicLic ?? p.vlOrig,
-    maturityDate: p.maturityDate ?? p.dtVencto ?? undefined,
+    maturityDate: p.maturityDate != null ? String(p.maturityDate) : (p.dtVencto != null ? String(p.dtVencto) : undefined),
     benchMark: p.index,
     extra: {
       bondType: p.bondType,
@@ -264,6 +265,30 @@ function mapTerm(items: any[]): UnifiedAsset[] {
   }));
 }
 
+function mapPension(items: any[]): UnifiedAsset[] {
+  return (items ?? []).map((p) => ({
+    assetClass: 'PENSION' as AssetClass,
+    name: p.planName ?? p.fundName ?? p.fundType ?? 'Previdência',
+    securityCode: p.cnpj,
+    grossValue: p.grossValue ?? p.totalValue ?? 0,
+    netValue: p.netValue,
+    costPrice: p.appliedValue ?? p.totalApplied,
+    acquisitionDate: p.startDate ?? p.contractDate,
+    extra: {
+      fundType: p.fundType,
+      planName: p.planName ?? p.fundName,
+      cnpj: p.cnpj,
+      taxRegime: p.taxRegime,
+      incomeType: p.incomeType,
+      startDate: p.startDate,
+      rentability: p.rentability != null ? parseFloat(p.rentability) : undefined,
+      iofValue: p.iofValue,
+      irValue: p.irValue,
+      status: p.status,
+    } satisfies AgoraPensionExtra,
+  }));
+}
+
 // ─── Funções públicas por classe de ativo ────────────────────────────────────
 
 export async function getDetailedEquities(cpfCnpj: string, accountCode: string): Promise<UnifiedAsset[]> {
@@ -351,6 +376,17 @@ export async function getDetailedTerm(cpfCnpj: string, accountCode: string): Pro
   }
 }
 
+// Previdência: endpoint diferente — só CPF, sem accountCode
+export async function getDetailedPension(cpfCnpj: string): Promise<UnifiedAsset[]> {
+  try {
+    logger.info(`Ágora: buscando previdência para CPF ${cpfCnpj}`);
+    const data = await agoraGet(`/consolidatedposition/pension/${cpfCnpj}`);
+    return mapPension(extractArray(data, 'pension', 'pensions', 'plans'));
+  } catch (err: any) {
+    throw new ConsolidatorError('AGORA_PENSION_ERROR', `Erro ao buscar previdência: ${err?.response?.data?.message ?? err.message}`, 'AGORA', err?.response?.status ?? 502);
+  }
+}
+
 // ─── Posição completa — busca todas as classes e consolida ───────────────────
 
 export async function getAgoraDetailedPosition(
@@ -370,13 +406,14 @@ export async function getAgoraDetailedPosition(
     getDetailedFutures(cpfCnpj, accountCode),
     getDetailedBtc(cpfCnpj, accountCode),
     getDetailedTerm(cpfCnpj, accountCode),
+    getDetailedPension(cpfCnpj),             // só CPF — sem accountCode
   ]);
 
   const assets: UnifiedAsset[] = [];
   const errors: string[] = [];
 
   results.forEach((result, i) => {
-    const labels = ['equities','fixedIncome','treasuryDirect','funds','coe','options','futures','btc','term'];
+    const labels = ['equities','fixedIncome','treasuryDirect','funds','coe','options','futures','btc','term','pension'];
     if (result.status === 'fulfilled') {
       assets.push(...result.value);
     } else {

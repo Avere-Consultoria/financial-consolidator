@@ -187,6 +187,19 @@ export interface AgoraTermExtra {
   currentAssetPrice?: number;
 }
 
+export interface AgoraPensionExtra {
+  fundType?: string;        // "VGBL", "PGBL"
+  planName?: string;
+  cnpj?: string;
+  taxRegime?: string;       // "Progressivo", "Regressivo"
+  incomeType?: string;
+  startDate?: string;
+  rentability?: number;
+  iofValue?: number;
+  irValue?: number;
+  status?: string;
+}
+
 // ─── Avenue — Extras e tipos por view ────────────────────────────────────────
 
 export interface AvenueAucExtra {
