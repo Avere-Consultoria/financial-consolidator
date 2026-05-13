@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { getAvenueActiveClients } from '../connectors/avenue/activeClients';
 import { getAvenueAuc } from '../connectors/avenue/auc';
 import { getAvenueCashBalance } from '../connectors/avenue/cashBalance';
+import { getAvenueAccountInsights } from '../connectors/avenue/accountInsights';
 import { ConsolidatorError } from '../types';
 import { logger } from '../utils/logger';
 import { parseCpfCnpj } from '../utils/validation';
@@ -70,6 +71,24 @@ router.get('/cash-balance', async (req: Request, res: Response) => {
     const date = getDateParam(req);
     const data = await getAvenueCashBalance(date);
     return res.json({ source: 'AVENUE', date, count: data.length, data });
+  } catch (err) {
+    return handleError(err, res);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /avenue/account-insights?date=YYYY-MM-DD&cpf=XXX
+// Insights analíticos por conta (equivalente ao painel Extranet da Avenue)
+// Retorna categoria, texto do insight, prioridade e valor financeiro associado
+// ?cpf é opcional — se informado, filtra apenas os insights daquele cliente
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/account-insights', async (req: Request, res: Response) => {
+  try {
+    const date = getDateParam(req);
+    const cpfRaw = req.query.cpf as string | undefined;
+    const cpf = cpfRaw ? parseCpfCnpj(cpfRaw, 'cpf') : undefined;
+    const data = await getAvenueAccountInsights(date, cpf);
+    return res.json({ source: 'AVENUE', date, cpf: cpf ?? null, count: data.length, data });
   } catch (err) {
     return handleError(err, res);
   }

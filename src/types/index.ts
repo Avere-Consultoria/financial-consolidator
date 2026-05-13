@@ -86,6 +86,110 @@ export interface ApiResponse<T> {
   };
 }
 
+// ─── Ágora — Extras tipados por classe de ativo ──────────────────────────────
+
+export interface AgoraEquityExtra {
+  source?: string;
+  securityType?: string;
+  companyName?: string;
+  availableQuantity?: number;
+  blockedQuantity?: number;
+  averagePrice?: number;
+  valueAppreciation?: number;
+  percentAppreciation?: number;
+}
+
+export interface AgoraFixedIncomeExtra {
+  bondType?: string;
+  issuerName?: string;
+  indexerPercentage?: number;
+  valueAppreciation?: number;
+  percentAppreciation?: number;
+  sourceCode?: string;
+}
+
+export interface AgoraTreasuryExtra {
+  bondType?: string;
+  marketType?: string;
+  purchasePrice?: number;
+  vlPriceSell?: number;
+  vlAppreciation?: number;
+  percAppreciation?: number;
+  guaranteeQuantity?: number;
+}
+
+export interface AgoraFundExtra {
+  sourceCode?: string;
+  referenceDate?: string;
+  iofValue?: number;
+  irValue?: number;
+  status?: string;
+  openForApplication?: boolean;
+  openForRescue?: boolean;
+  vlApprec?: number;
+  pcApprec?: number;
+}
+
+export interface AgoraCoeExtra {
+  coeId?: string;
+  issuerName?: string;
+  ratingCode?: string;
+  status?: string;
+  lackTime?: number;
+  pcVariation?: number;
+}
+
+export interface AgoraOptionExtra {
+  stockType?: string;
+  exercisePrice?: number;
+  averagePrice?: number;
+  valueAppreciation?: number;
+  percentAppreciation?: number;
+}
+
+export interface AgoraFutureExtra {
+  buyQuantity?: number;
+  sellQuantity?: number;
+  currentPriceValue?: number;
+  totalNotional?: number;
+}
+
+export interface AgoraBtcExtra {
+  side?: string;
+  tax?: number;
+  openDate?: string;
+  contractPrice?: number;
+  contractValue?: number;
+  vlLiq?: number;
+}
+
+export interface AgoraTermExtra {
+  price?: number;
+  contractValue?: number;
+  result?: number;
+  percentage?: number;
+  currentAssetPrice?: number;
+}
+
+// ─── Avenue — Extras e tipos por view ────────────────────────────────────────
+
+export interface AvenueAucExtra {
+  currencyOriginal: 'USD';
+  grossValueUsd: number;
+  officeName: string;
+}
+
+export interface AvenueAccountInsight {
+  date: string;
+  clientCpf: string;
+  clientName: string;
+  categoria: string;   // ex: "Risco", "Oportunidade", "Diversificação"
+  insight: string;     // texto descritivo do insight
+  prioridade: string;  // ex: "Alta", "Média", "Baixa"
+  moeda: string;       // "BRL" ou "USD"
+  valor: number;       // valor financeiro associado ao insight
+}
+
 // ─── Erros ────────────────────────────────────────────────────────────────────
 
 export class ConsolidatorError extends Error {

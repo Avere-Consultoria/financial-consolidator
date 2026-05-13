@@ -6,7 +6,7 @@ import {
 import { cacheService } from '../cache';
 import { ApiResponse, Institution, ConsolidatorError } from '../types';
 import { logger } from '../utils/logger';
-import { getAgoraConsolidatedPosition } from '../connectors/agora/consolidatedPosition';
+import { getAgoraDetailedPosition } from '../connectors/agora/detailedPosition';
 import { getAvenuePosition } from '../connectors/avenue/position';
 import { parseCpfCnpj } from '../utils/validation';
 
@@ -67,7 +67,7 @@ router.get('/agora/:cpfCnpj/:accountCode', async (req: Request, res: Response) =
   const cleanAccount = accountCode.replace(/\D/g, '');
 
   try {
-    const data = await getAgoraConsolidatedPosition(cleanCpf, cleanAccount);
+    const data = await getAgoraDetailedPosition(cleanCpf, cleanAccount);
     const response: ApiResponse<typeof data> = {
       success: true,
       data,

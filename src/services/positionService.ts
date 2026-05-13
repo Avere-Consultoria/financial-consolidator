@@ -1,6 +1,6 @@
 import { getBtgPosition } from '../connectors/btg/position';
 import { getXpPosition } from '../connectors/xp/position';
-import { getAgoraConsolidatedPosition } from '../connectors/agora/consolidatedPosition';
+import { getAgoraDetailedPosition } from '../connectors/agora/detailedPosition';
 import { getAvenuePosition } from '../connectors/avenue/position';
 import { cacheService } from '../cache';
 import { logger } from '../utils/logger';
@@ -50,10 +50,9 @@ export async function getPositionByInstitution(
       case 'AVENUE': // <-- Adicionado!
       position = await getAvenuePosition(accountNumber);
       break;
-      case 'AGORA': // <-- ADICIONADO!
-      // A Ágora exige CPF e Conta. O consolidador precisa lidar com isso.
-      if (!cpf) throw new Error('CPF é obrigatório para consultas na Ágora');
-      position = await getAgoraConsolidatedPosition(cpf, accountNumber);
+    case 'AGORA':
+      if (!cpf) throw new ConsolidatorError('AGORA_MISSING_CPF', 'CPF é obrigatório para consultas na Ágora', 'AGORA', 400);
+      position = await getAgoraDetailedPosition(cpf, accountNumber);
       break;
     default:
       throw new ConsolidatorError('UNKNOWN_INSTITUTION', `Instituição desconhecida: ${institution}`, undefined, 400);

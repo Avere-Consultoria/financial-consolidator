@@ -1,6 +1,20 @@
 import axios from 'axios';
 import { logger } from '../../utils/logger';
-import { UnifiedPosition, UnifiedAsset, AssetClass, ConsolidatorError } from '../../types';
+import {
+  UnifiedPosition,
+  UnifiedAsset,
+  AssetClass,
+  ConsolidatorError,
+  AgoraEquityExtra,
+  AgoraFixedIncomeExtra,
+  AgoraTreasuryExtra,
+  AgoraFundExtra,
+  AgoraCoeExtra,
+  AgoraOptionExtra,
+  AgoraFutureExtra,
+  AgoraBtcExtra,
+  AgoraTermExtra,
+} from '../../types';
 import { getAgoraBaseUrl, getAgoraHeaders, getAgoraHttpsAgent } from './auth';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -40,7 +54,7 @@ function mapEquities(items: any[]): UnifiedAsset[] {
       averagePrice: p.averagePrice,
       valueAppreciation: p.valueAppreciation,
       percentAppreciation: p.percentAppreciation,
-    },
+    } satisfies AgoraEquityExtra,
   }));
 }
 
@@ -63,7 +77,7 @@ function mapFixedIncome(items: any[]): UnifiedAsset[] {
       valueAppreciation: p.valueAppreciation,
       percentAppreciation: p.percentAppreciation,
       sourceCode: p.sourceCode,
-    },
+    } satisfies AgoraFixedIncomeExtra,
   }));
 }
 
@@ -84,7 +98,7 @@ function mapTreasuryDirect(items: any[]): UnifiedAsset[] {
       vlAppreciation: p.vlAppreciation,
       percAppreciation: p.percAppreciation,
       guaranteeQuantity: p.guaranteeQuantity,
-    },
+    } satisfies AgoraTreasuryExtra,
   }));
 }
 
@@ -108,7 +122,7 @@ function mapFunds(items: any[]): UnifiedAsset[] {
       openForRescue: p.openForRescue,
       vlApprec: p.vlApprec,
       pcApprec: p.pcApprec,
-    },
+    } satisfies AgoraFundExtra,
   }));
 }
 
@@ -127,7 +141,7 @@ function mapCoe(items: any[]): UnifiedAsset[] {
       status: p.status,
       lackTime: p.lackTime,
       pcVariation: p.pcVariation,
-    },
+    } satisfies AgoraCoeExtra,
   }));
 }
 
@@ -147,7 +161,7 @@ function mapOptions(items: any[]): UnifiedAsset[] {
       averagePrice: p.averagePrice,
       valueAppreciation: p.valueAppreciation,
       percentAppreciation: p.percentAppreciation,
-    },
+    } satisfies AgoraOptionExtra,
   }));
 }
 
@@ -164,7 +178,7 @@ function mapFutures(items: any[]): UnifiedAsset[] {
       sellQuantity: p.sellQuantity,
       currentPriceValue: p.currentPriceValue,
       totalNotional: p.totalNotional,
-    },
+    } satisfies AgoraFutureExtra,
   }));
 }
 
@@ -184,7 +198,7 @@ function mapBtc(items: any[]): UnifiedAsset[] {
       contractPrice: p.contractPrice,
       contractValue: p.contractValue,
       vlLiq: p.vlLiq,
-    },
+    } satisfies AgoraBtcExtra,
   }));
 }
 
@@ -203,7 +217,7 @@ function mapTerm(items: any[]): UnifiedAsset[] {
       result: p.result,
       percentage: p.percentage,
       currentAssetPrice: p.currentAssetPrice,
-    },
+    } satisfies AgoraTermExtra,
   }));
 }
 

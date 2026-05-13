@@ -1,4 +1,4 @@
-import { UnifiedPosition, UnifiedAsset, AssetClass } from '../../types';
+import { UnifiedPosition, UnifiedAsset, AssetClass, AvenueAucExtra } from '../../types';
 
 // O "De-Para" Sênior: Protege o sistema contra tipos inesperados da corretora
 function classificarAvenueParaAvere(productType: string): AssetClass {
@@ -43,12 +43,11 @@ export function mapAvenueToUnifiedPosition(
       marketPrice: marketPrice,
       maturityDate: item.maturityDate || undefined,
       isLiquidity: item.productType.includes('Balance'),
-      // O 'extra' é perfeito para salvar o saldo em USD sem poluir o tipo principal
       extra: {
         currencyOriginal: 'USD',
         grossValueUsd: Number(item.aucUsd) || 0,
-        officeName: item.officeName
-      }
+        officeName: item.officeName,
+      } satisfies AvenueAucExtra
     };
   });
 
