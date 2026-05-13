@@ -126,6 +126,8 @@ export interface AgoraFundExtra {
   status?: string;
   openForApplication?: boolean;
   openForRescue?: boolean;
+  rentability?: number;   // rentabilidade total do fundo (%)
+  vlUp?: number;          // valor atualizado (aplicado + valorização)
   vlApprec?: number;
   pcApprec?: number;
 }

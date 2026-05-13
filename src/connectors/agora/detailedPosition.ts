@@ -19,12 +19,15 @@ import { getAgoraBaseUrl, getAgoraHeaders, getAgoraHttpsAgent } from './auth';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Ágora — Posição Detalhada (item a item por classe de ativo)
+// Base path: /managers-position-mgmt/v1  (diferente do portfolio-mgmt!)
 // Endpoints GET com Bearer Token no header
 // TPS limite: 20 requisições/segundo
 // ─────────────────────────────────────────────────────────────────────────────
 
+const BASE_PATH = '/managers-position-mgmt/v1';
+
 async function agoraGet(path: string): Promise<any> {
-  const url = `${getAgoraBaseUrl()}${path}`;
+  const url = `${getAgoraBaseUrl()}${BASE_PATH}${path}`;
   const headers = await getAgoraHeaders();
 
   const { data } = await axios.get(url, {
@@ -120,6 +123,8 @@ function mapFunds(items: any[]): UnifiedAsset[] {
       status: p.status,
       openForApplication: p.openForApplication,
       openForRescue: p.openForRescue,
+      rentability: p.rentability != null ? parseFloat(p.rentability) : undefined,
+      vlUp: p.vlUp ?? undefined,
       vlApprec: p.vlApprec,
       pcApprec: p.pcApprec,
     } satisfies AgoraFundExtra,
