@@ -37,6 +37,29 @@ async function agoraGet(path: string): Promise<any> {
   return data;
 }
 
+// ─── Extração de envelope — cada endpoint da Ágora envolve o array numa chave diferente ──
+//
+// Exemplos observados:
+//   equities      → { consolidatedPosition: [...], statusCode: 200, errors: [] }
+//   funds         → { funds: [...] }
+//   fixedIncome   → { fixedIncomes: [...] }  ou array direto
+//   treasuryDirect→ { treasuryDirect: [...] }
+//
+// Estratégia: tenta chaves conhecidas em ordem; cai no "primeiro array do objeto" como fallback.
+function extractArray(data: any, ...preferredKeys: string[]): any[] {
+  if (Array.isArray(data)) return data;
+  for (const key of preferredKeys) {
+    if (Array.isArray(data?.[key])) return data[key];
+  }
+  // Fallback genérico: primeiro valor que for array dentro do objeto
+  if (data && typeof data === 'object') {
+    for (const val of Object.values(data)) {
+      if (Array.isArray(val)) return val as any[];
+    }
+  }
+  return [];
+}
+
 // ─── Mappers — converte resposta da Ágora para UnifiedAsset ──────────────────
 
 function mapEquities(items: any[]): UnifiedAsset[] {
@@ -91,7 +114,7 @@ function mapTreasuryDirect(items: any[]): UnifiedAsset[] {
     quantity: p.bondQuantity,
     grossValue: p.positionValue ?? p.vlGross ?? 0,
     costPrice: p.vlAplicLic ?? p.vlOrig,
-    maturityDate: String(p.maturityDate ?? p.dtVencto),
+    maturityDate: p.maturityDate ?? p.dtVencto ?? undefined,
     benchMark: p.index,
     extra: {
       bondType: p.bondType,
@@ -232,7 +255,7 @@ export async function getDetailedEquities(cpfCnpj: string, accountCode: string):
   try {
     logger.info(`Ágora: buscando ações para conta ${accountCode}`);
     const data = await agoraGet(`/consolidatedposition/equities/${cpfCnpj}/${accountCode}`);
-    return mapEquities(Array.isArray(data) ? data : data?.positions ?? [data]);
+    return mapEquities(extractArray(data, 'consolidatedPosition', 'positions', 'equities'));
   } catch (err: any) {
     throw new ConsolidatorError('AGORA_EQUITIES_ERROR', `Erro ao buscar ações: ${err?.response?.data?.message ?? err.message}`, 'AGORA', err?.response?.status ?? 502);
   }
@@ -242,7 +265,7 @@ export async function getDetailedFixedIncome(cpfCnpj: string, accountCode: strin
   try {
     logger.info(`Ágora: buscando renda fixa para conta ${accountCode}`);
     const data = await agoraGet(`/detailedposition/fixedIncome/${cpfCnpj}/${accountCode}`);
-    return mapFixedIncome(Array.isArray(data) ? data : [data]);
+    return mapFixedIncome(extractArray(data, 'fixedIncomes', 'fixedIncome', 'bonds'));
   } catch (err: any) {
     throw new ConsolidatorError('AGORA_FIXED_INCOME_ERROR', `Erro ao buscar renda fixa: ${err?.response?.data?.message ?? err.message}`, 'AGORA', err?.response?.status ?? 502);
   }
@@ -252,7 +275,7 @@ export async function getDetailedTreasuryDirect(cpfCnpj: string, accountCode: st
   try {
     logger.info(`Ágora: buscando tesouro direto para conta ${accountCode}`);
     const data = await agoraGet(`/consolidatedposition/treasuryDirect/${cpfCnpj}/${accountCode}`);
-    return mapTreasuryDirect(Array.isArray(data) ? data : [data]);
+    return mapTreasuryDirect(extractArray(data, 'treasuryDirect', 'treasuryDirects', 'bonds'));
   } catch (err: any) {
     throw new ConsolidatorError('AGORA_TREASURY_ERROR', `Erro ao buscar tesouro direto: ${err?.response?.data?.message ?? err.message}`, 'AGORA', err?.response?.status ?? 502);
   }
@@ -262,7 +285,7 @@ export async function getDetailedFunds(cpfCnpj: string, accountCode: string): Pr
   try {
     logger.info(`Ágora: buscando fundos para conta ${accountCode}`);
     const data = await agoraGet(`/consolidatedposition/funds/${cpfCnpj}/${accountCode}`);
-    return mapFunds(Array.isArray(data) ? data : [data]);
+    return mapFunds(extractArray(data, 'funds', 'investmentFunds'));
   } catch (err: any) {
     throw new ConsolidatorError('AGORA_FUNDS_ERROR', `Erro ao buscar fundos: ${err?.response?.data?.message ?? err.message}`, 'AGORA', err?.response?.status ?? 502);
   }
@@ -271,7 +294,7 @@ export async function getDetailedFunds(cpfCnpj: string, accountCode: string): Pr
 export async function getDetailedCoe(cpfCnpj: string, accountCode: string): Promise<UnifiedAsset[]> {
   try {
     const data = await agoraGet(`/consolidatedposition/coe/${cpfCnpj}/${accountCode}`);
-    return mapCoe(Array.isArray(data) ? data : [data]);
+    return mapCoe(extractArray(data, 'coe', 'coes'));
   } catch (err: any) {
     throw new ConsolidatorError('AGORA_COE_ERROR', `Erro ao buscar COE: ${err?.response?.data?.message ?? err.message}`, 'AGORA', err?.response?.status ?? 502);
   }
@@ -280,7 +303,7 @@ export async function getDetailedCoe(cpfCnpj: string, accountCode: string): Prom
 export async function getDetailedOptions(cpfCnpj: string, accountCode: string): Promise<UnifiedAsset[]> {
   try {
     const data = await agoraGet(`/consolidatedposition/option/${cpfCnpj}/${accountCode}`);
-    return mapOptions(Array.isArray(data) ? data : [data]);
+    return mapOptions(extractArray(data, 'options', 'option'));
   } catch (err: any) {
     throw new ConsolidatorError('AGORA_OPTIONS_ERROR', `Erro ao buscar opções: ${err?.response?.data?.message ?? err.message}`, 'AGORA', err?.response?.status ?? 502);
   }
@@ -289,7 +312,7 @@ export async function getDetailedOptions(cpfCnpj: string, accountCode: string): 
 export async function getDetailedFutures(cpfCnpj: string, accountCode: string): Promise<UnifiedAsset[]> {
   try {
     const data = await agoraGet(`/consolidatedposition/futures/${cpfCnpj}/${accountCode}`);
-    return mapFutures(Array.isArray(data) ? data : [data]);
+    return mapFutures(extractArray(data, 'futures', 'future'));
   } catch (err: any) {
     throw new ConsolidatorError('AGORA_FUTURES_ERROR', `Erro ao buscar futuros: ${err?.response?.data?.message ?? err.message}`, 'AGORA', err?.response?.status ?? 502);
   }
@@ -298,7 +321,7 @@ export async function getDetailedFutures(cpfCnpj: string, accountCode: string): 
 export async function getDetailedBtc(cpfCnpj: string, accountCode: string): Promise<UnifiedAsset[]> {
   try {
     const data = await agoraGet(`/consolidatedposition/btc/${cpfCnpj}/${accountCode}`);
-    return mapBtc(Array.isArray(data) ? data : [data]);
+    return mapBtc(extractArray(data, 'btc', 'btcPositions'));
   } catch (err: any) {
     throw new ConsolidatorError('AGORA_BTC_ERROR', `Erro ao buscar BTC/aluguel: ${err?.response?.data?.message ?? err.message}`, 'AGORA', err?.response?.status ?? 502);
   }
@@ -307,7 +330,7 @@ export async function getDetailedBtc(cpfCnpj: string, accountCode: string): Prom
 export async function getDetailedTerm(cpfCnpj: string, accountCode: string): Promise<UnifiedAsset[]> {
   try {
     const data = await agoraGet(`/consolidatedposition/term/${cpfCnpj}/${accountCode}`);
-    return mapTerm(Array.isArray(data) ? data : [data]);
+    return mapTerm(extractArray(data, 'term', 'terms'));
   } catch (err: any) {
     throw new ConsolidatorError('AGORA_TERM_ERROR', `Erro ao buscar termo: ${err?.response?.data?.message ?? err.message}`, 'AGORA', err?.response?.status ?? 502);
   }

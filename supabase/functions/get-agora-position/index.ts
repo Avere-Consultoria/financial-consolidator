@@ -47,23 +47,24 @@ Deno.serve(async (req) => {
     }
 
     // Se salvou o snapshot, salva os ativos
-    if (data.assets) {
+    if (data.assets && data.assets.length > 0) {
         const ativos = data.assets.map((a: any) => ({
             snapshot_id: snapshot.id,
             tipo: a.assetClass,
-            sub_tipo: a.extra?.instrumentType || a.assetClass,
+            sub_tipo: a.name,
             emissor: a.name || 'Ágora',
-            ticker: a.extra?.instrumentType || a.name,
-            valor_bruto: a.grossValue,
-            quantidade: 1
+            ticker: a.ticker || a.name,
+            valor_bruto: Number(a.grossValue || 0),
+            valor_liquido: Number(a.netValue || a.grossValue || 0),
+            quantidade: Number(a.quantity ?? 1),
         }))
         await supabase.from('posicao_agora_ativos').delete().eq('snapshot_id', snapshot.id)
         const { error: ativosError } = await supabase.from('posicao_agora_ativos').insert(ativos)
         if (ativosError) console.error("ERRO ATIVOS:", ativosError)
     }
 
-    return new Response(JSON.stringify({ success: true, data }), { 
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+    return new Response(JSON.stringify({ success: true, data }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
 
   } catch (err: any) {

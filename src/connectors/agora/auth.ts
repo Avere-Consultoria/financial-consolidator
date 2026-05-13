@@ -15,6 +15,8 @@ interface TokenCache {
 }
 
 let tokenCache: TokenCache | null = null;
+// Gate: se já há uma busca em voo, todos os chamadores aguardam a mesma promise
+let tokenPromise: Promise<string> | null = null;
 
 export function getAgoraBaseUrl(): string {
   return process.env.AGORA_ENVIRONMENT === 'production'
@@ -45,6 +47,22 @@ export async function getAgoraToken(): Promise<string> {
     logger.debug('Ágora: reutilizando token em cache');
     return tokenCache.token;
   }
+
+  // Evita race condition: se já há uma busca de token em voo, reutiliza a mesma promise
+  if (tokenPromise) {
+    logger.debug('Ágora: aguardando token já em busca...');
+    return tokenPromise;
+  }
+
+  tokenPromise = _fetchNewToken().finally(() => {
+    tokenPromise = null;
+  });
+
+  return tokenPromise;
+}
+
+async function _fetchNewToken(): Promise<string> {
+  const now = Date.now();
 
   const clientId     = process.env.AGORA_CLIENT_ID;
   const clientSecret = process.env.AGORA_CLIENT_SECRET;
