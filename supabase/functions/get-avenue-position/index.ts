@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { classifyAvere, suggestLiquidezAvere } from '../_shared/classifyAvere.ts'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Edge Function: get-avenue-position
@@ -95,6 +96,9 @@ Deno.serve(async (req) => {
       const { error: insError } = await supabase.from('posicao_avenue_ativos').insert(bulkAtivos)
       if (insError) console.error('Erro ao salvar ativos:', insError.message)
     }
+
+    // ── Popular dicionário com ativos novos ────────────────────────────────
+    await upsertDicionario(supabase, aucData)
 
     // 9. Retorno para o Front-end (formatado conforme padrão BTG)
     return new Response(
@@ -209,4 +213,59 @@ function mapTipoLabel(assetClass: string): string {
     OTHER:           'Outros',
   }
   return map[assetClass] ?? assetClass
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// upsertDicionario — insere ativos novos em dicionario_ativos
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function upsertDicionario(supabase: any, aucData: any[]) {
+  const rows: any[] = []
+
+  for (const item of aucData) {
+    let codigo: string | null = null
+    let tipo = 'TICKER'
+    if (item.isin)          { codigo = item.isin;          tipo = 'ISIN'  }
+    else if (item.productSymbol) { codigo = item.productSymbol; tipo = 'TICKER' }
+    else if (item.productCusip)  { codigo = item.productCusip;  tipo = 'CUSIP'  }
+    if (!codigo) continue
+
+    const productType = item.productType || ''
+    const assetClass  = classificarProductType(productType)
+
+    rows.push({
+      codigo_identificador: codigo,
+      tipo_identificador:   tipo,
+      nome_ativo:           item.productName || codigo,
+      benchmark:            null,
+      instituicao_origem:   'AVENUE',
+      classe_original:      mapTipoLabel(assetClass),
+      classe_avere: classifyAvere({
+        assetClass,
+        institution:  'AVENUE',
+        productType:  productType || null,
+        name:         item.productName  ?? null,
+        maturityDate: item.maturityDate ?? null,
+        isLiquidity:  productType.includes('Balance'),
+      }),
+      liquidez_avere: suggestLiquidezAvere({
+        assetClass,
+        institution:  'AVENUE',
+        maturityDate: item.maturityDate ?? null,
+        isLiquidity:  productType.includes('Balance'),
+      }),
+    })
+  }
+
+  if (rows.length === 0) return
+
+  const { error } = await supabase
+    .from('dicionario_ativos')
+    .upsert(rows, {
+      onConflict:       'codigo_identificador,tipo_identificador',
+      ignoreDuplicates: true,
+    })
+
+  if (error) console.error('Erro ao popular dicionário Avenue:', error.message)
+  else console.log(`Dicionário Avenue: upsert de ${rows.length} ativo(s) concluído`)
 }

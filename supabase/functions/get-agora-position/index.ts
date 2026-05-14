@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { classifyAvere, suggestLiquidezAvere } from '../_shared/classifyAvere.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -118,6 +119,11 @@ Deno.serve(async (req) => {
         if (ativosError) console.error("ERRO ATIVOS:", ativosError)
     }
 
+    // ── Popular dicionário com ativos novos ──────────────────────────────────
+    if (data.assets?.length > 0) {
+      await upsertDicionario(supabase, data.assets)
+    }
+
     return new Response(JSON.stringify({ success: true, data }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
@@ -130,3 +136,70 @@ Deno.serve(async (req) => {
     })
   }
 })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// upsertDicionario — insere ativos novos em dicionario_ativos
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function upsertDicionario(supabase: any, assets: any[]) {
+  const seen  = new Set<string>()
+  const rows: any[] = []
+
+  for (const a of assets) {
+    let codigo: string | null = null
+    let tipo = 'TICKER'
+
+    if (a.securityCode)      { codigo = a.securityCode;      tipo = 'ISIN'   }
+    else if (a.extra?.cnpj)  { codigo = a.extra.cnpj;        tipo = 'CNPJ'   }
+    else if (a.ticker)       { codigo = a.ticker;             tipo = 'TICKER' }
+    // Tesouro Direto: sem código direto — usa bondType + vencimento como chave composta
+    else if (a.extra?.bondType && a.maturityDate) {
+      codigo = `${a.extra.bondType}-${String(a.maturityDate).split('T')[0]}`
+      tipo   = 'TICKER'
+    }
+
+    if (!codigo) continue
+    if (seen.has(codigo)) continue   // deduplicar lotes do mesmo título
+    seen.add(codigo)
+
+    rows.push({
+      codigo_identificador: codigo,
+      tipo_identificador:   tipo,
+      nome_ativo:           a.name || codigo,
+      benchmark:            a.benchMark || a.indexRate || a.extra?.bondRate || null,
+      instituicao_origem:   'AGORA',
+      classe_original:      mapTipoLabel(a.assetClass),
+      classe_avere: classifyAvere({
+        assetClass:   a.assetClass,
+        institution:  'AGORA',
+        maturityDate: a.maturityDate   ?? null,
+        isLiquidity:  a.isLiquidity    ?? false,
+        benchMark:    a.benchMark      ?? null,
+        indexRate:    a.indexRate      ?? null,
+        bondType:     a.extra?.bondType ?? null,
+        name:         a.name           ?? null,
+      }),
+      liquidez_avere: suggestLiquidezAvere({
+        assetClass:   a.assetClass,
+        institution:  'AGORA',
+        maturityDate: a.maturityDate ?? null,
+        isLiquidity:  a.isLiquidity  ?? false,
+      }),
+    })
+  }
+
+  console.log(`Dicionário Ágora: ${rows.length} ativos candidatos`)
+  if (rows.length === 0) return
+
+  // ignoreDuplicates: true → INSERT ... ON CONFLICT (codigo_identificador, tipo_identificador) DO NOTHING
+  // Nunca sobrescreve classificações já feitas pelo master
+  const { error } = await supabase
+    .from('dicionario_ativos')
+    .upsert(rows, {
+      onConflict:       'codigo_identificador,tipo_identificador',
+      ignoreDuplicates: true,
+    })
+
+  if (error) console.error('Erro ao popular dicionário Ágora:', error.message)
+  else console.log(`Dicionário Ágora: upsert de ${rows.length} ativo(s) concluído`)
+}

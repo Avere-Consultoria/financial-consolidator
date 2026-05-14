@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { classifyAvere, suggestLiquidezAvere } from '../_shared/classifyAvere.ts'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Edge Function: get-btg-position
@@ -161,6 +162,9 @@ Deno.serve(async (req) => {
     } else {
       console.warn(`Cliente não encontrado para conta BTG ${accountNumber}`)
     }
+
+    // ── Popular dicionário com ativos novos ────────────────────────────────
+    await upsertDicionario(supabase, assets, 'BTG')
 
     // ── Retornar ao front em camelCase (formato BtgApi.tsx) ────────────────
     const ativos = parsed.map(({ frontRow }) => frontRow)
@@ -357,4 +361,63 @@ function errorResponse(message: string, status: number) {
     JSON.stringify({ success: false, error: { message } }),
     { status, headers: { ...corsHeaders(), 'Content-Type': 'application/json' } }
   )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// upsertDicionario — insere ativos novos em dicionario_ativos (nunca sobrescreve
+// classificações já feitas pelo master)
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function upsertDicionario(supabase: any, assets: any[], institution: string) {
+  const rows: any[] = []
+
+  for (const a of assets) {
+    // Escolhe o melhor identificador disponível
+    let codigo: string | null = null
+    let tipo = 'TICKER'
+    if (a.extra?.isin)       { codigo = a.extra.isin;       tipo = 'ISIN'  }
+    else if (a.extra?.cetipCode) { codigo = a.extra.cetipCode; tipo = 'ISIN'  }
+    else if (a.extra?.cnpj)  { codigo = a.extra.cnpj;       tipo = 'CNPJ'  }
+    else if (a.ticker)       { codigo = a.ticker;            tipo = 'TICKER'}
+    else if (a.securityCode) { codigo = a.securityCode;      tipo = 'TICKER'}
+    if (!codigo) continue
+
+    rows.push({
+      codigo_identificador: codigo,
+      tipo_identificador:   tipo,
+      nome_ativo:           a.name || codigo,
+      benchmark:            a.benchMark || a.indexRate || null,
+      instituicao_origem:   institution,
+      classe_original:      mapTipoLabel(a.assetClass),
+      classe_avere: classifyAvere({
+        assetClass:  a.assetClass,
+        institution,
+        maturityDate: a.maturityDate ?? null,
+        isLiquidity:  a.isLiquidity  ?? false,
+        benchMark:    a.benchMark    ?? null,
+        indexRate:    a.indexRate    ?? null,
+        subTipo:      parsearTicker(a.ticker ?? '', a.assetClass).subTipo || null,
+        name:         a.name         ?? null,
+        isFII:        a.extra?.isFII === 'true' || a.extra?.isFII === true,
+      }),
+      liquidez_avere: suggestLiquidezAvere({
+        assetClass:  a.assetClass,
+        institution,
+        maturityDate: a.maturityDate ?? null,
+        isLiquidity:  a.isLiquidity  ?? false,
+      }),
+    })
+  }
+
+  if (rows.length === 0) return
+
+  const { error } = await supabase
+    .from('dicionario_ativos')
+    .upsert(rows, {
+      onConflict:       'codigo_identificador,tipo_identificador',
+      ignoreDuplicates: true,
+    })
+
+  if (error) console.error('Erro ao popular dicionário BTG:', error.message)
+  else console.log(`Dicionário BTG: upsert de ${rows.length} ativo(s) concluído`)
 }
