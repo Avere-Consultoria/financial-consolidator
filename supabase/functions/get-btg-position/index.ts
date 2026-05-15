@@ -389,6 +389,7 @@ async function upsertDicionario(supabase: any, assets: any[], institution: strin
       benchmark:            a.benchMark || a.indexRate || null,
       instituicao_origem:   institution,
       classe_original:      mapTipoLabel(a.assetClass),
+      data_vencimento: a.maturityDate ? String(a.maturityDate).split('T')[0] : null,
       classe_avere: classifyAvere({
         assetClass:  a.assetClass,
         institution,

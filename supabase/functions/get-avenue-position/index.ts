@@ -240,6 +240,7 @@ async function upsertDicionario(supabase: any, aucData: any[]) {
       benchmark:            null,
       instituicao_origem:   'AVENUE',
       classe_original:      mapTipoLabel(assetClass),
+      data_vencimento: a.maturityDate ? String(a.maturityDate).split('T')[0] : null,
       classe_avere: classifyAvere({
         assetClass,
         institution:  'AVENUE',
