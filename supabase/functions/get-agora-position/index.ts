@@ -175,7 +175,7 @@ async function upsertDicionario(supabase: any, assets: any[]) {
         institution:  'AGORA',
         maturityDate: a.maturityDate   ?? null,
         isLiquidity:  a.isLiquidity    ?? false,
-        benchMark:    a.benchMark      ?? null,
+        benchMark:    a.benchMark      ?? a.extra?.bondRate ?? null,  // bondRate contém "IPCA +5.3%" quando benchMark é nulo
         indexRate:    a.indexRate      ?? null,
         bondType:     a.extra?.bondType ?? null,
         name:         a.name           ?? null,

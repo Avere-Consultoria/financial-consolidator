@@ -402,10 +402,11 @@ async function upsertDicionario(supabase: any, assets: any[], institution: strin
         isFII:        a.extra?.isFII === 'true' || a.extra?.isFII === true,
       }),
       liquidez_avere: suggestLiquidezAvere({
-        assetClass:  a.assetClass,
+        assetClass:    a.assetClass,
         institution,
-        maturityDate: a.maturityDate ?? null,
-        isLiquidity:  a.isLiquidity  ?? false,
+        maturityDate:  a.maturityDate        ?? null,
+        isLiquidity:   a.isLiquidity         ?? false,
+        fundLiquidity: a.extra?.fundLiquidity ?? null,
       }),
     })
   }

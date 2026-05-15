@@ -127,22 +127,29 @@ export function classifyAvere(p: ClassifyInput): ClasseAvere {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // suggestLiquidezAvere
-// Retorna o D+ sugerido para dicionario_ativos.liquidez_avere (string)
+// Retorna o D+ sugerido para dicionario_ativos.liquidez_avere (string | null)
+// null = sem dado automático → master preenche manualmente
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function suggestLiquidezAvere(p: {
-  assetClass:   string
-  institution:  string
-  maturityDate?: string | null
-  isLiquidity?:  boolean
-}): string {
+  assetClass:     string
+  institution:    string
+  maturityDate?:  string | null
+  isLiquidity?:   boolean
+  fundLiquidity?: number | string | null  // D+ reportado pela API do fundo (ex: BTG FundLiquidity)
+}): string | null {
   const { assetClass } = p
 
+  // ── Ativos com convenção clara ─────────────────────────────────────────────
   if (assetClass === 'CASH')     return '0'
-  if (assetClass === 'EQUITIES') return '2'   // D+2 padrão bolsa
-  if (assetClass === 'PENSION')  return '720' // padrão AVERE — master ajusta
-  if (assetClass === 'CRYPTO')   return '1'
+  if (assetClass === 'EQUITIES') return '2'   // D+2 padrão liquidação bolsa
+  if (assetClass === 'CRYPTO')   return '1'   // D+1 convenção
 
+  // ── Previdência: produto vitalício, sem vencimento definido ────────────────
+  // Master preenche manualmente com base no planejamento do cliente
+  if (assetClass === 'PENSION')  return null
+
+  // ── Renda Fixa: calcula dias até o vencimento ──────────────────────────────
   if (assetClass === 'FIXED_INCOME') {
     if (p.isLiquidity || !p.maturityDate) return '0'
     const days = Math.ceil(
@@ -151,6 +158,18 @@ export function suggestLiquidezAvere(p: {
     return String(Math.max(0, days))
   }
 
-  // Fundos variam muito — deixa em branco para o master preencher
-  return ''
+  // ── Fundos: usa dado real da API quando disponível ─────────────────────────
+  if (assetClass === 'INVESTMENT_FUND') {
+    // 1. Preferência: D+ informado pela API (ex: BTG FundLiquidity = 61)
+    if (p.fundLiquidity != null && p.fundLiquidity !== '') {
+      return String(p.fundLiquidity)
+    }
+    // 2. Flag de liquidez diária (Ágora/XP) → D+1
+    if (p.isLiquidity) return '1'
+    // 3. Sem dados → master preenche
+    return null
+  }
+
+  // ── Demais classes (DERIVATIVE, COMMODITY, OTHER) → master preenche ────────
+  return null
 }
