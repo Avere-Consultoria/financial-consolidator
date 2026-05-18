@@ -48,7 +48,12 @@ export async function getXpPosition(accountNumber: string): Promise<UnifiedPosit
     logger.error('XP: erro ao buscar posição', { accountNumber, status, data });
 
     if (status === 401) {
-      throw new ConsolidatorError('XP_UNAUTHORIZED', 'Token XP inválido ou expirado', 'XP', 401);
+      // Distingue bloqueio de IP (CDN devolve HTML) de token inválido
+      const isIpBlock = typeof data === 'string' && data.includes('Acesso Bloqueado');
+      const msg = isIpBlock
+        ? 'IP bloqueado pelo CDN da XP — solicite liberação em bloqueio-cdn@xpi.com.br'
+        : 'Token XP inválido ou expirado';
+      throw new ConsolidatorError('XP_UNAUTHORIZED', msg, 'XP', 401);
     }
     if (status === 429) {
       throw new ConsolidatorError('XP_RATE_LIMIT', 'Rate limit XP excedido', 'XP', 429);
