@@ -313,6 +313,13 @@ async function upsertDicionario(supabase: any, assets: any[]) {
         maturityDate: a.maturityDate ?? null,
         isLiquidity:  a.isLiquidity  ?? false,
       }),
+      vencimento_api_original: a.maturityDate ? String(a.maturityDate).split('T')[0] : null,
+      liquidez_api_original: suggestLiquidezAvere({
+        assetClass:  a.assetClass,
+        institution: 'XP',
+        maturityDate: a.maturityDate ?? null,
+        isLiquidity:  a.isLiquidity  ?? false,
+      }),
     })
   }
 

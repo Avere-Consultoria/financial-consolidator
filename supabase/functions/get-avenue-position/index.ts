@@ -240,7 +240,7 @@ async function upsertDicionario(supabase: any, aucData: any[]) {
       benchmark:            null,
       instituicao_origem:   'AVENUE',
       classe_original:      mapTipoLabel(assetClass),
-      data_vencimento: a.maturityDate ? String(a.maturityDate).split('T')[0] : null,
+      data_vencimento: item.maturityDate ? String(item.maturityDate).split('T')[0] : null,
       classe_avere: classifyAvere({
         assetClass,
         institution:  'AVENUE',
@@ -250,6 +250,13 @@ async function upsertDicionario(supabase: any, aucData: any[]) {
         isLiquidity:  productType.includes('Balance'),
       }),
       liquidez_avere: suggestLiquidezAvere({
+        assetClass,
+        institution:  'AVENUE',
+        maturityDate: item.maturityDate ?? null,
+        isLiquidity:  productType.includes('Balance'),
+      }),
+      vencimento_api_original: item.maturityDate ? String(item.maturityDate).split('T')[0] : null,
+      liquidez_api_original: suggestLiquidezAvere({
         assetClass,
         institution:  'AVENUE',
         maturityDate: item.maturityDate ?? null,
