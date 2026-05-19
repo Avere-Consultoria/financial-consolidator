@@ -256,12 +256,7 @@ async function upsertDicionario(supabase: any, aucData: any[]) {
         isLiquidity:  productType.includes('Balance'),
       }),
       vencimento_api_original: item.maturityDate ? String(item.maturityDate).split('T')[0] : null,
-      liquidez_api_original: suggestLiquidezAvere({
-        assetClass,
-        institution:  'AVENUE',
-        maturityDate: item.maturityDate ?? null,
-        isLiquidity:  productType.includes('Balance'),
-      }),
+      liquidez_api_original: productType.includes('Balance') ? '0' : null,
     })
   }
 

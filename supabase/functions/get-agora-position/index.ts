@@ -187,12 +187,7 @@ async function upsertDicionario(supabase: any, assets: any[]) {
         isLiquidity:  a.isLiquidity  ?? false,
       }),
       vencimento_api_original: a.maturityDate ? String(a.maturityDate).split('T')[0] : null,
-      liquidez_api_original: suggestLiquidezAvere({
-        assetClass:   a.assetClass,
-        institution:  'AGORA',
-        maturityDate: a.maturityDate ?? null,
-        isLiquidity:  a.isLiquidity  ?? false,
-      }),
+      liquidez_api_original: a.isLiquidity ? '0' : null,
     })
   }
 

@@ -409,13 +409,9 @@ async function upsertDicionario(supabase: any, assets: any[], institution: strin
         fundLiquidity: a.extra?.fundLiquidity ?? null,
       }),
       vencimento_api_original: a.maturityDate ? String(a.maturityDate).split('T')[0] : null,
-      liquidez_api_original: suggestLiquidezAvere({
-        assetClass:    a.assetClass,
-        institution,
-        maturityDate:  a.maturityDate        ?? null,
-        isLiquidity:   a.isLiquidity         ?? false,
-        fundLiquidity: a.extra?.fundLiquidity ?? null,
-      }),
+      liquidez_api_original: (a.extra?.fundLiquidity != null && a.extra?.fundLiquidity !== '')
+        ? String(a.extra.fundLiquidity)
+        : (a.isLiquidity ? '0' : null),
     })
   }
 
