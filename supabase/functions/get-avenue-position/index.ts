@@ -1,156 +1,224 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { classifyAvere, suggestLiquidezAvere } from '../_shared/classifyAvere.ts'
+import { createServiceClient } from '../_shared/supabaseClient.ts'
+import { corsHeaders, errorResponse, jsonResponse } from '../_shared/cors.ts'
+import { validarAuth, validarOwnershipCliente } from '../_shared/auth.ts'
+import { toDateOnly } from '../_shared/dates.ts'
+import { fetchConsolidator, ConsolidatorError } from '../_shared/consolidator.ts'
+import {
+  resolverOuCriarCanonico,
+  detectarIsFii,
+  type Identificador,
+  type CanonicoSugerido,
+} from '../_shared/canonico.ts'
+import { normalizarSubTipo } from '../_shared/normalizarSubTipo.ts'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Edge Function: get-avenue-position
 // ─────────────────────────────────────────────────────────────────────────────
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
-}
-
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders, status: 200 })
-  }
-
-  const CONSOLIDATOR_URL = Deno.env.get('CONSOLIDATOR_URL')
-  const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
-  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders, status: 200 })
 
   try {
-    if (!CONSOLIDATOR_URL) throw new Error('🚨 CONSOLIDATOR_URL não configurada!')
+    // ── Auth ────────────────────────────────────────────────────────────
+    const authResult = await validarAuth(req)
+    if ('error' in authResult) return authResult.error
+    const ctx = authResult.ctx
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    const supabase = createServiceClient()
 
-    const { clientId } = await req.json()
-    if (!clientId) throw new Error('clientId não enviado')
+    const { clientId } = await req.json().catch(() => ({}))
+    if (!clientId) return errorResponse('clientId é obrigatório', 400)
 
-    // 1. Busca dados do cliente para obter o CPF (codigo_avenue)
+    const ownerError = await validarOwnershipCliente(ctx, clientId)
+    if (ownerError) return ownerError
+
     const { data: cliente } = await supabase
       .from('clientes')
       .select('id, codigo_avenue')
       .eq('id', clientId)
       .single()
 
-    if (!cliente?.codigo_avenue) throw new Error('Código Avenue (CPF) não encontrado no banco')
+    if (!cliente?.codigo_avenue) return errorResponse('Código Avenue não encontrado', 404)
 
-    // 2. Define data de referência (4 dias atrás para garantir custódia fechada)
+    // Avenue trabalha com data alvo (custódia fechada — D-4)
     const dateObj = new Date()
     dateObj.setDate(dateObj.getDate() - 4)
     const targetDate = dateObj.toISOString().split('T')[0]
+    const dataSincronizacao = new Date().toISOString()
 
-    // 3. Chamada à API do Consolidador
-    const fetchUrl = `${CONSOLIDATOR_URL}/api/v1/avenue/auc?date=${targetDate}&cpf=${cliente.codigo_avenue}`
-    
-    const response = await fetch(fetchUrl, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-    })
+    const rawJson = await fetchConsolidator(
+      `/api/v1/avenue/auc?date=${targetDate}&cpf=${cliente.codigo_avenue}`,
+      { method: 'GET' }
+    )
+    const aucData: any[] = Array.isArray(rawJson?.data) ? rawJson.data : []
 
-    if (!response.ok) {
-      throw new Error(`Erro na API Avenue: status ${response.status}`)
+    console.log(`Processando ${aucData.length} ativos Avenue`)
+
+    // Resolver canônico por ativo (sequencial)
+    const parsed = []
+    for (const item of aucData) {
+      const ativoCanonicoId = await resolverCanonicoAvenue(supabase, item)
+      parsed.push(parseAtivoAvenue(item, ativoCanonicoId))
     }
 
-    const rawJson = await response.json()
-
-    // A API retorna { data: AvenueAucEntry[] } — já filtrado pelo CPF passado na query
-    const aucData: any[] = Array.isArray(rawJson.data) ? rawJson.data : []
-
-    console.log(`Processando ${aucData.length} ativos para o CPF ${cliente.codigo_avenue}`)
-
-    // 5. Parsear ativos
-    const parsed = aucData.map((item) => parseAtivoAvenue(item))
-
-    // 6. Calcular Totais para o Snapshot
     const totais = calcularTotais(parsed)
 
-    // 7. Salvar Snapshot no Supabase
     const { data: snapshot, error: snapError } = await supabase
       .from('posicao_avenue_snapshots')
       .upsert({
-        cliente_id:       clientId,
-        data_referencia:  targetDate,
-        patrimonio_total: totais.patrimonio_total,
-        patrimonio_usd:   totais.patrimonio_usd,
-        saldo_caixa:      totais.saldo_caixa,
-        saldo_rf:         totais.saldo_rf,
-        saldo_rv:         totais.saldo_rv,
-        saldo_fundos:     totais.saldo_fundos,
-        saldo_cripto:     totais.saldo_cripto,
-        saldo_outros:     totais.saldo_outros,
-        source:           'AVENUE_CONSOLIDATOR_V1',
+        cliente_id:         clientId,
+        data_referencia:    targetDate,
+        data_sincronizacao: dataSincronizacao,
+        patrimonio_total:   totais.patrimonio_total,
+        patrimonio_usd:     totais.patrimonio_usd,
+        saldo_caixa:        totais.saldo_caixa,
+        saldo_rf:           totais.saldo_rf,
+        saldo_rv:           totais.saldo_rv,
+        saldo_fundos:       totais.saldo_fundos,
+        saldo_cripto:       totais.saldo_cripto,
+        saldo_outros:       totais.saldo_outros,
+        source:             'AVENUE_CONSOLIDATOR_V1',
       }, { onConflict: 'cliente_id,data_referencia' })
       .select('id')
       .single()
 
-    if (snapError || !snapshot) throw snapError || new Error('Falha ao gerar snapshot')
+    if (snapError || !snapshot) {
+      console.error('Erro snapshot Avenue:', snapError?.message)
+      return errorResponse('Falha ao salvar snapshot', 500)
+    }
 
-    // 8. Limpar e Inserir novos ativos vinculados ao Snapshot
     await supabase.from('posicao_avenue_ativos').delete().eq('snapshot_id', snapshot.id)
 
     if (parsed.length > 0) {
       const bulkAtivos = parsed.map(({ dbRow }) => ({ snapshot_id: snapshot.id, ...dbRow }))
       const { error: insError } = await supabase.from('posicao_avenue_ativos').insert(bulkAtivos)
-      if (insError) console.error('Erro ao salvar ativos:', insError.message)
+      if (insError) console.error('Erro ao salvar ativos Avenue:', insError.message)
     }
 
-    // ── Popular dicionário com ativos novos ────────────────────────────────
-    await upsertDicionario(supabase, aucData)
+    return jsonResponse({
+      patrimonioTotal:    totais.patrimonio_total,
+      patrimonioTotalUsd: totais.patrimonio_usd,
+      dataReferencia:     targetDate,
+      alocacao: [
+        { classe: 'Caixa (USD)',    valor: totais.saldo_caixa  },
+        { classe: 'Renda Variável', valor: totais.saldo_rv     },
+        { classe: 'Renda Fixa',     valor: totais.saldo_rf     },
+        { classe: 'Fundos',         valor: totais.saldo_fundos },
+        { classe: 'Criptomoedas',   valor: totais.saldo_cripto },
+        { classe: 'Outros',         valor: totais.saldo_outros },
+      ].filter(a => a.valor > 0),
+      ativos: parsed.map(p => p.frontRow),
+    })
 
-    // 9. Retorno para o Front-end (formatado conforme padrão BTG)
-    return new Response(
-      JSON.stringify({
-        patrimonioTotal:    totais.patrimonio_total,
-        patrimonioTotalUsd: totais.patrimonio_usd,
-        dataReferencia:     targetDate,
-        alocacao: [
-          { classe: 'Caixa (USD)',   valor: totais.saldo_caixa  },
-          { classe: 'Renda Variável', valor: totais.saldo_rv     },
-          { classe: 'Renda Fixa',    valor: totais.saldo_rf      },
-          { classe: 'Fundos',        valor: totais.saldo_fundos  },
-          { classe: 'Criptomoedas',  valor: totais.saldo_cripto  },
-          { classe: 'Outros',        valor: totais.saldo_outros  },
-        ].filter(a => a.valor > 0),
-        ativos: parsed.map(p => p.frontRow),
-      }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
-
-  } catch (err: any) {
-    console.error('ERRO:', err.message)
-    return new Response(
-      JSON.stringify({ error: err.message }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+  } catch (err: unknown) {
+    if (err instanceof ConsolidatorError) {
+      console.error('Erro no consolidador Avenue:', err.message)
+      return errorResponse(err.message, err.status)
+    }
+    console.error('Erro na Edge Function Avenue:', (err as Error)?.message)
+    return errorResponse('Erro interno', 500)
   }
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Funções Auxiliares
+// Resolução de canônico (Avenue)
+// Prioridade: ISIN > CUSIP > TICKER (productSymbol)
 // ─────────────────────────────────────────────────────────────────────────────
 
-// item é AvenueAucEntry (propriedades camelCase mapeadas pelo consolidador)
-function parseAtivoAvenue(item: any) {
+async function resolverCanonicoAvenue(supabase: any, item: any): Promise<string | null> {
+  const lookup = coletarIdentificadoresAvenue(item)
+  const principal = lookup[0]
+  if (!principal) return null
+
   const productType = item.productType || ''
   const assetClass  = classificarProductType(productType)
-  const tipoLabel   = mapTipoLabel(assetClass)
+  const isBalance   = productType.includes('Balance')
+
+  const sugestao: CanonicoSugerido = {
+    nome_canonico:      item.productName || item.productSymbol || 'Ativo Avenue',
+    classe_avere: classifyAvere({
+      assetClass,
+      institution:  'AVENUE',
+      productType:  productType || null,
+      name:         item.productName  ?? null,
+      maturityDate: item.maturityDate ?? null,
+      isLiquidity:  isBalance,
+    }),
+    liquidez_avere: suggestLiquidezAvere({
+      assetClass,
+      institution:  'AVENUE',
+      maturityDate: item.maturityDate ?? null,
+      isLiquidity:  isBalance,
+    }),
+    data_vencimento:    toDateOnly(item.maturityDate),
+    taxa_canonica:      null,
+    benchmark_canonico: null,
+    sub_tipo_canonico:  normalizarSubTipo(productType),
+    is_fii:             detectarIsFii(item.productName),
+    is_coe:             false,
+  }
+
+  return await resolverOuCriarCanonico(
+    supabase,
+    lookup,
+    sugestao,
+    {
+      instituicao_origem:      'AVENUE',
+      identificador_principal: principal,
+      nome_ativo:              item.productName || item.productSymbol || '',
+      emissor_original:        item.productName || null,
+      classe_original:         mapTipoLabelAvenue(assetClass),
+      liquidez_api_original:   isBalance ? '0' : null,
+      vencimento_api_original: toDateOnly(item.maturityDate),
+      index_rate:              null,
+    },
+  )
+}
+
+function coletarIdentificadoresAvenue(item: any): Identificador[] {
+  const ids: Identificador[] = []
+  if (item.isin)          ids.push({ tipo: 'ISIN',   codigo: item.isin })
+  if (item.productCusip)  ids.push({ tipo: 'CUSIP',  codigo: item.productCusip })
+  if (item.productSymbol) ids.push({ tipo: 'TICKER', codigo: item.productSymbol })
+  return ids
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+function mapTipoLabelAvenue(assetClass: string): string {
+  const map: Record<string, string> = {
+    FIXED_INCOME:    'Renda Fixa',
+    INVESTMENT_FUND: 'Fundos',
+    EQUITIES:        'Renda Variável',
+    CASH:            'Caixa (USD)',
+    CRYPTO:          'Criptomoedas',
+    OTHER:           'Outros',
+  }
+  return map[assetClass] ?? assetClass
+}
+
+function parseAtivoAvenue(item: any, ativoCanonicoId: string | null) {
+  const productType = item.productType || ''
+  const assetClass  = classificarProductType(productType)
+  const tipoLabel   = mapTipoLabelAvenue(assetClass)
   const isLiquidity = productType.includes('Balance')
 
   const dbRow = {
-    asset_class:     assetClass,
-    tipo:            tipoLabel,
-    product_type:    productType,
-    nome:            item.productName   || null,
-    ticker:          item.productSymbol || null,
-    quantidade:      item.quantity      ?? null,
-    valor_bruto_brl: item.aucBrl        ?? 0,
-    valor_bruto_usd: item.aucUsd        ?? 0,
-    maturity_date:   item.maturityDate  || null,
-    is_liquidity:    isLiquidity,
-    office_name:     item.officeName    || null,
+    ativo_canonico_id: ativoCanonicoId,
+    asset_class:       assetClass,
+    tipo:              tipoLabel,
+    product_type:      productType,
+    nome:              item.productName   || null,
+    ticker:            item.productSymbol || null,
+    quantidade:        item.quantity      ?? null,
+    valor_bruto_brl:   item.aucBrl        ?? 0,
+    valor_bruto_usd:   item.aucUsd        ?? 0,
+    maturity_date:     item.maturityDate  || null,
+    is_liquidity:      isLiquidity,
+    office_name:       item.officeName    || null,
   }
 
   const frontRow = {
@@ -164,34 +232,34 @@ function parseAtivoAvenue(item: any) {
     valorUsd:     item.aucUsd        ?? 0,
     vencimento:   item.maturityDate  || null,
     isLiquidity,
-    extra: {
-      assetType: productType,
-      currency:  'USD',
-    },
+    extra: { assetType: productType, currency: 'USD' },
   }
 
   return { dbRow, frontRow }
 }
 
-function calcularTotais(parsed: any[]) {
-  let patrimonio_total = 0, patrimonio_usd = 0, saldo_caixa = 0, saldo_rf = 0, saldo_rv = 0, saldo_fundos = 0, saldo_cripto = 0, saldo_outros = 0
+function calcularTotais(parsed: { dbRow: any }[]) {
+  const t = {
+    patrimonio_total: 0, patrimonio_usd: 0,
+    saldo_caixa: 0, saldo_rf: 0, saldo_rv: 0,
+    saldo_fundos: 0, saldo_cripto: 0, saldo_outros: 0,
+  }
 
-  parsed.forEach(({ dbRow }) => {
+  for (const { dbRow } of parsed) {
     const brl = dbRow.valor_bruto_brl
-    patrimonio_total += brl
-    patrimonio_usd   += dbRow.valor_bruto_usd
+    t.patrimonio_total += brl
+    t.patrimonio_usd   += dbRow.valor_bruto_usd
 
     switch (dbRow.asset_class) {
-      case 'CASH':            saldo_caixa  += brl; break
-      case 'FIXED_INCOME':    saldo_rf     += brl; break
-      case 'EQUITIES':        saldo_rv     += brl; break
-      case 'INVESTMENT_FUND': saldo_fundos += brl; break
-      case 'CRYPTO':          saldo_cripto += brl; break
-      default:                saldo_outros += brl
+      case 'CASH':            t.saldo_caixa  += brl; break
+      case 'FIXED_INCOME':    t.saldo_rf     += brl; break
+      case 'EQUITIES':        t.saldo_rv     += brl; break
+      case 'INVESTMENT_FUND': t.saldo_fundos += brl; break
+      case 'CRYPTO':          t.saldo_cripto += brl; break
+      default:                t.saldo_outros += brl
     }
-  })
-
-  return { patrimonio_total, patrimonio_usd, saldo_caixa, saldo_rf, saldo_rv, saldo_fundos, saldo_cripto, saldo_outros }
+  }
+  return t
 }
 
 function classificarProductType(type: string): string {
@@ -201,74 +269,4 @@ function classificarProductType(type: string): string {
   if (type.includes('Stocks') || type.includes('ETF') || type.includes('UCIT')) return 'EQUITIES'
   if (type.includes('Crypto'))  return 'CRYPTO'
   return 'OTHER'
-}
-
-function mapTipoLabel(assetClass: string): string {
-  const map: Record<string, string> = {
-    FIXED_INCOME:    'Renda Fixa',
-    INVESTMENT_FUND: 'Fundos',
-    EQUITIES:        'Renda Variável',
-    CASH:            'Caixa (USD)',
-    CRYPTO:          'Criptomoedas',
-    OTHER:           'Outros',
-  }
-  return map[assetClass] ?? assetClass
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// upsertDicionario — insere ativos novos em dicionario_ativos
-// ─────────────────────────────────────────────────────────────────────────────
-
-async function upsertDicionario(supabase: any, aucData: any[]) {
-  const rows: any[] = []
-
-  for (const item of aucData) {
-    let codigo: string | null = null
-    let tipo = 'TICKER'
-    if (item.isin)          { codigo = item.isin;          tipo = 'ISIN'  }
-    else if (item.productSymbol) { codigo = item.productSymbol; tipo = 'TICKER' }
-    else if (item.productCusip)  { codigo = item.productCusip;  tipo = 'CUSIP'  }
-    if (!codigo) continue
-
-    const productType = item.productType || ''
-    const assetClass  = classificarProductType(productType)
-
-    rows.push({
-      codigo_identificador: codigo,
-      tipo_identificador:   tipo,
-      nome_ativo:           item.productName || codigo,
-      benchmark:            null,
-      instituicao_origem:   'AVENUE',
-      classe_original:      mapTipoLabel(assetClass),
-      data_vencimento: item.maturityDate ? String(item.maturityDate).split('T')[0] : null,
-      classe_avere: classifyAvere({
-        assetClass,
-        institution:  'AVENUE',
-        productType:  productType || null,
-        name:         item.productName  ?? null,
-        maturityDate: item.maturityDate ?? null,
-        isLiquidity:  productType.includes('Balance'),
-      }),
-      liquidez_avere: suggestLiquidezAvere({
-        assetClass,
-        institution:  'AVENUE',
-        maturityDate: item.maturityDate ?? null,
-        isLiquidity:  productType.includes('Balance'),
-      }),
-      vencimento_api_original: item.maturityDate ? String(item.maturityDate).split('T')[0] : null,
-      liquidez_api_original: productType.includes('Balance') ? '0' : null,
-    })
-  }
-
-  if (rows.length === 0) return
-
-  const { error } = await supabase
-    .from('dicionario_ativos')
-    .upsert(rows, {
-      onConflict:       'codigo_identificador,tipo_identificador',
-      ignoreDuplicates: true,
-    })
-
-  if (error) console.error('Erro ao popular dicionário Avenue:', error.message)
-  else console.log(`Dicionário Avenue: upsert de ${rows.length} ativo(s) concluído`)
 }

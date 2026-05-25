@@ -130,6 +130,7 @@ export interface AgoraTreasuryExtra {
   vlAppreciation?: number;
   percAppreciation?: number;
   guaranteeQuantity?: number;
+  acquisitions?: any[];   // histórico de aplicações TD (detailedposition)
 }
 
 export interface AgoraFundExtra {
@@ -144,6 +145,7 @@ export interface AgoraFundExtra {
   vlUp?: number;          // valor atualizado (aplicado + valorização)
   vlApprec?: number;
   pcApprec?: number;
+  acquisitions?: any[];   // histórico de aplicações Fundo (detailedposition)
 }
 
 export interface AgoraCoeExtra {

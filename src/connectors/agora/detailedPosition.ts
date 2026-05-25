@@ -140,6 +140,7 @@ function mapTreasuryDirect(items: any[]): UnifiedAsset[] {
       vlAppreciation: p.vlAppreciation,
       percAppreciation: p.percAppreciation,
       guaranteeQuantity: p.guaranteeQuantity,
+      acquisitions: p._acquisitions ?? [],   // histórico de aplicações TD (detailedposition)
     } satisfies AgoraTreasuryExtra,
   }));
 }
@@ -166,6 +167,7 @@ function mapFunds(items: any[]): UnifiedAsset[] {
       vlUp: p.vlUp ?? undefined,
       vlApprec: p.vlApprec,
       pcApprec: p.pcApprec,
+      acquisitions: p._acquisitions ?? [],   // histórico de aplicações (detailedposition)
     } satisfies AgoraFundExtra,
   }));
 }
@@ -326,7 +328,24 @@ export async function getDetailedTreasuryDirect(cpfCnpj: string, accountCode: st
   try {
     logger.info(`Ágora: buscando tesouro direto para conta ${accountCode}`);
     const data = await agoraGet(`/consolidatedposition/treasuryDirect/${cpfCnpj}/${accountCode}`);
-    return mapTreasuryDirect(extractArray(data, 'treasuryDirect', 'treasuryDirects', 'bonds'));
+    const items = extractArray(data, 'treasuryDirect', 'treasuryDirects', 'bonds');
+
+    // Enriquece cada TD com o histórico de aplicações via /detailedposition/treasuryDirect
+    const enriched = await Promise.all(items.map(async (item) => {
+      if (!item.bondType || !item.maturityDate) return { ...item, _acquisitions: [] };
+      try {
+        const detail = await agoraGet(
+          `/detailedposition/treasuryDirect/${cpfCnpj}/${accountCode}/${encodeURIComponent(item.bondType)}/${item.maturityDate}`
+        );
+        const acquisitions = extractArray(detail, 'detailedPosition');
+        return { ...item, _acquisitions: acquisitions };
+      } catch (err: any) {
+        logger.warn(`Ágora: falha detailed TD ${item.bondType}/${item.maturityDate}`, { reason: err?.message });
+        return { ...item, _acquisitions: [] };
+      }
+    }));
+
+    return mapTreasuryDirect(enriched);
   } catch (err: any) {
     throw new ConsolidatorError('AGORA_TREASURY_ERROR', `Erro ao buscar tesouro direto: ${err?.response?.data?.message ?? err.message}`, 'AGORA', err?.response?.status ?? 502);
   }
@@ -336,7 +355,24 @@ export async function getDetailedFunds(cpfCnpj: string, accountCode: string): Pr
   try {
     logger.info(`Ágora: buscando fundos para conta ${accountCode}`);
     const data = await agoraGet(`/consolidatedposition/funds/${cpfCnpj}/${accountCode}`);
-    return mapFunds(extractArray(data, 'funds', 'investmentFunds'));
+    const items = extractArray(data, 'funds', 'investmentFunds');
+
+    // Enriquece cada fundo com o histórico de aplicações via /detailedposition/funds
+    const enriched = await Promise.all(items.map(async (item) => {
+      if (item.sourceCode == null) return { ...item, _acquisitions: [] };
+      try {
+        const detail = await agoraGet(
+          `/detailedposition/funds/${cpfCnpj}/${accountCode}/${item.sourceCode}`
+        );
+        const acquisitions = extractArray(detail, 'detailedFunds');
+        return { ...item, _acquisitions: acquisitions };
+      } catch (err: any) {
+        logger.warn(`Ágora: falha detailed Funds sourceCode=${item.sourceCode}`, { reason: err?.message });
+        return { ...item, _acquisitions: [] };
+      }
+    }));
+
+    return mapFunds(enriched);
   } catch (err: any) {
     throw new ConsolidatorError('AGORA_FUNDS_ERROR', `Erro ao buscar fundos: ${err?.response?.data?.message ?? err.message}`, 'AGORA', err?.response?.status ?? 502);
   }

@@ -1,86 +1,100 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { classifyAvere, suggestLiquidezAvere } from '../_shared/classifyAvere.ts'
+import { createServiceClient } from '../_shared/supabaseClient.ts'
+import { corsHeaders, errorResponse, jsonResponse } from '../_shared/cors.ts'
+import { validarAuth, validarOwnershipCliente } from '../_shared/auth.ts'
+import { toDateOnly, todayISO } from '../_shared/dates.ts'
+import { mapTipoLabel, mapSubTipoPadrao } from '../_shared/assetClassMap.ts'
+import { fetchConsolidator, ConsolidatorError } from '../_shared/consolidator.ts'
+import {
+  resolverOuCriarCanonico,
+  sugerirCanonicoComClassificacao,
+  type Identificador,
+} from '../_shared/canonico.ts'
+import { normalizarSubTipo } from '../_shared/normalizarSubTipo.ts'
+import type { UnifiedAsset } from '../_shared/types.ts'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Edge Function: get-xp-position
 // Deploy: supabase functions deploy get-xp-position --no-verify-jwt
 // ─────────────────────────────────────────────────────────────────────────────
 
-const CONSOLIDATOR_URL = Deno.env.get('CONSOLIDATOR_URL') ?? 'http://localhost:3333'
-
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders() })
-  }
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    )
+    // ── Auth ────────────────────────────────────────────────────────────
+    const authResult = await validarAuth(req)
+    if ('error' in authResult) return authResult.error
+    const ctx = authResult.ctx
 
-    // ── Parâmetros ────────────────────────────────────────────────────────────
+    const supabase = createServiceClient()
+
     const url = new URL(req.url)
     let accountNumber = url.searchParams.get('account')
     let clientId      = url.searchParams.get('clientId')
 
     if (req.method === 'POST') {
-      const body    = await req.json()
+      const body    = await req.json().catch(() => ({}))
       accountNumber = accountNumber ?? body.account
       clientId      = clientId      ?? body.clientId
     }
 
     if (!accountNumber) return errorResponse('Parâmetro "account" é obrigatório', 400)
 
-    console.log(`Buscando posição XP para conta ${accountNumber}...`)
-
-    // ── Chamar o consolidador ─────────────────────────────────────────────────
-    const consolidatorRes = await fetch(
-      `${CONSOLIDATOR_URL}/api/v1/position/xp/${accountNumber}`,
-      { headers: { 'Content-Type': 'application/json' } }
-    )
-
-    if (!consolidatorRes.ok) {
-      const err = await consolidatorRes.json().catch(() => ({}))
-      return errorResponse(
-        err?.error?.message ?? `Erro no consolidador XP: ${consolidatorRes.status}`,
-        consolidatorRes.status
-      )
+    // ── Resolve cliente_id + autorização ───────────────────────────────
+    if (!clientId) {
+      const { data: cliente } = await supabase
+        .from('clientes')
+        .select('id')
+        .eq('codigo_xp', accountNumber)
+        .maybeSingle()
+      clientId = cliente?.id ?? null
     }
+    if (!clientId) return errorResponse('Cliente não encontrado para o account informado', 404)
 
-    const { data: position } = await consolidatorRes.json()
+    const ownerError = await validarOwnershipCliente(ctx, clientId)
+    if (ownerError) return ownerError
+
+    console.log('Buscando posição XP…')
+
+    const consolidatorJson = await fetchConsolidator(`/api/v1/position/xp/${accountNumber}`)
+    const position = consolidatorJson?.data
     if (!position) return errorResponse('Nenhum dado retornado pelo consolidador XP', 502)
 
-    const assets: any[] = position.assets ?? []
-    const today = new Date().toISOString().split('T')[0]
+    const assets: UnifiedAsset[] = position.assets ?? []
 
-    // ── Normalizar ativos ─────────────────────────────────────────────────────
-    const parsed = assets.map((a: any) => parseAtivo(a))
+    const dataReferencia    = toDateOnly(position.positionDate) ?? todayISO()
+    const dataSincronizacao = new Date().toISOString()
 
-    // ── Calcular totais ───────────────────────────────────────────────────────
-    const totais = calcularTotais(assets)
+    // ── Resolver canônico por ativo, sequencial ──────────────────────────
+    const parsed: ParsedXP[] = []
+    for (const asset of assets) {
+      const ativoCanonicoId = await resolverCanonicoXP(supabase, asset)
+      parsed.push(parseAtivo(asset, ativoCanonicoId))
+    }
 
-    // ── Persistir no Supabase ─────────────────────────────────────────────────
+    const totais = calcularTotais(parsed)
+
     if (clientId) {
       const { data: snapshot, error: snapError } = await supabase
         .from('posicao_xp_snapshots')
         .upsert({
-          cliente_id:              clientId,
-          data_referencia:         today,
-          patrimonio_total:        totais.patrimonio_total,
+          cliente_id:               clientId,
+          data_referencia:          dataReferencia,
+          data_sincronizacao:       dataSincronizacao,
+          patrimonio_total:         totais.patrimonio_total,
           patrimonio_total_liquido: totais.patrimonio_total_liquido,
-          valor_disponivel:        totais.saldo_cc,
-          saldo_acoes:             totais.saldo_rv,
-          saldo_fundos:            totais.saldo_fundos,
-          saldo_renda_fixa:        totais.saldo_rf,
-          saldo_tesouro_direto:    totais.saldo_td,
-          saldo_previdencia:       totais.saldo_prev,
-          saldo_coe:               totais.saldo_coe,
-          saldo_fii:               totais.saldo_fii,
-          saldo_outros:            totais.saldo_outros,
-          is_month_end:            false,
-          source:                  'XP_DATA_ACCESS_V1',
-          dado_atualizado:         true,
+          valor_disponivel:         totais.saldo_cc,
+          saldo_acoes:              totais.saldo_rv,
+          saldo_fundos:             totais.saldo_fundos,
+          saldo_renda_fixa:         totais.saldo_rf,
+          saldo_tesouro_direto:     totais.saldo_td,
+          saldo_previdencia:        totais.saldo_prev,
+          saldo_coe:                totais.saldo_coe,
+          saldo_fii:                totais.saldo_fii,
+          saldo_outros:             totais.saldo_outros,
+          is_month_end:             false,
+          source:                   'XP_DATA_ACCESS_V1',
+          dado_atualizado:          true,
         }, { onConflict: 'cliente_id,data_referencia' })
         .select('id')
         .single()
@@ -88,8 +102,6 @@ Deno.serve(async (req) => {
       if (snapError || !snapshot) {
         console.error('Erro ao salvar snapshot XP:', snapError?.message)
       } else {
-        console.log(`Snapshot XP salvo — R$ ${totais.patrimonio_total.toFixed(2)}`)
-
         await supabase.from('posicao_xp_ativos').delete().eq('snapshot_id', snapshot.id)
 
         if (parsed.length > 0) {
@@ -103,10 +115,6 @@ Deno.serve(async (req) => {
       console.warn('clientId não informado — snapshot não salvo')
     }
 
-    // ── Popular dicionário ────────────────────────────────────────────────────
-    await upsertDicionario(supabase, assets)
-
-    // ── Alocação para o front ─────────────────────────────────────────────────
     const alocacao = [
       { classe: 'Conta Corrente',         valor: totais.saldo_cc      },
       { classe: 'Renda Fixa',             valor: totais.saldo_rf      },
@@ -119,52 +127,110 @@ Deno.serve(async (req) => {
       { classe: 'Outros',                 valor: totais.saldo_outros  },
     ].filter(a => a.valor > 0)
 
-    return new Response(
-      JSON.stringify({
-        patrimonioTotal:        totais.patrimonio_total,
-        patrimonioTotalLiquido: totais.patrimonio_total_liquido,
-        dataReferencia:         today,
-        alocacao,
-        ativos: parsed.map(({ frontRow }) => frontRow),
-      }),
-      { headers: { ...corsHeaders(), 'Content-Type': 'application/json' } }
-    )
+    return jsonResponse({
+      patrimonioTotal:        totais.patrimonio_total,
+      patrimonioTotalLiquido: totais.patrimonio_total_liquido,
+      dataReferencia,
+      alocacao,
+      ativos: parsed.map(({ frontRow }) => frontRow),
+    })
 
-  } catch (err: any) {
-    console.error('Erro na Edge Function XP:', err.message)
-    return errorResponse(err.message ?? 'Erro interno', 500)
+  } catch (err: unknown) {
+    if (err instanceof ConsolidatorError) {
+      console.error('Erro no consolidador XP:', err.message)
+      return errorResponse(err.message, err.status)
+    }
+    console.error('Erro na Edge Function XP:', (err as Error)?.message)
+    return errorResponse('Erro interno', 500)
   }
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
-// parseAtivo — mapeia UnifiedAsset → dbRow (colunas existentes no banco) + frontRow
+// Resolução de canônico (XP)
+// Prioridade: ISIN > CNPJ > security_code/codigo_ativo > TICKER
 // ─────────────────────────────────────────────────────────────────────────────
 
-function parseAtivo(a: any) {
-  const tipoLabel = mapTipoLabel(a.assetClass)
-  const subTipo   = resolverSubTipo(a)
+async function resolverCanonicoXP(supabase: any, a: UnifiedAsset): Promise<string | null> {
+  const lookup: Identificador[] = coletarIdentificadoresXP(a)
+  const principal = lookup[0]
+  if (!principal) return null
 
-  // ── dbRow: usa os nomes de coluna exatos da posicao_xp_ativos ────────────
+  const subTipoNormalizado = normalizarSubTipo(resolverSubTipo(a))
+
+  return await resolverOuCriarCanonico(
+    supabase,
+    lookup,
+    sugerirCanonicoComClassificacao(a, 'XP', { sub_tipo_canonico: subTipoNormalizado }),
+    {
+      instituicao_origem:      'XP',
+      identificador_principal: principal,
+      nome_ativo:              a.name || '',
+      emissor_original:        a.name || null,
+      classe_original:         mapTipoLabel(a.assetClass),
+      liquidez_api_original:   a.isLiquidity ? '0' : null,
+      vencimento_api_original: toDateOnly(a.maturityDate),
+      index_rate:              a.indexRate ?? null,
+    },
+  )
+}
+
+function coletarIdentificadoresXP(a: UnifiedAsset): Identificador[] {
+  const ids: Identificador[] = []
+  if (a.extra?.isin)   ids.push({ tipo: 'ISIN',   codigo: a.extra.isin })
+  if (a.extra?.cnpj)   ids.push({ tipo: 'CNPJ',   codigo: a.extra.cnpj })
+  if (a.securityCode)  ids.push({ tipo: 'TICKER', codigo: a.securityCode })
+  if (a.ticker)        ids.push({ tipo: 'TICKER', codigo: a.ticker })
+  return ids
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// parseAtivo
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface ParsedXP {
+  dbRow: any
+  frontRow: any
+  assetClass: string
+  grossValue: number
+  netValue: number
+  subTipo: string
+  isFii: boolean
+  isTesouro: boolean
+  isCoe: boolean
+}
+
+function parseAtivo(a: UnifiedAsset, ativoCanonicoId: string | null): ParsedXP {
+  const tipoLabel = mapTipoLabel(a.assetClass)
+  const subTipoRaw = resolverSubTipo(a)
+  const subTipo    = normalizarSubTipo(subTipoRaw) ?? subTipoRaw
+  const upperName = (a.name ?? '').toUpperCase()
+  const isFii     = !!a.extra?.isFII || upperName.includes('FII')
+  const isTesouro = upperName.includes('TESOURO')
+  const isCoe     = a.assetClass === 'DERIVATIVE' && upperName.includes('COE')
+  const gross     = a.grossValue ?? 0
+  const net       = a.netValue ?? gross
+
   const dbRow = {
+    ativo_canonico_id:   ativoCanonicoId,
     asset_class:         a.assetClass,
     tipo:                tipoLabel,
-    sub_tipo:            subTipo                || null,
-    nome:                a.name                 || null,
-    ticker:              a.ticker               || null,
-    isin:                a.extra?.isin          || null,
-    codigo_ativo:        a.securityCode         || a.ticker || null,
-    emissor:             a.name                 || null,
-    cnpj:                a.extra?.cnpj          || null,
-    quantidade:          a.quantity             ?? null,
-    preco_unitario:      a.marketPrice          ?? null,
-    valor_bruto:         a.grossValue           ?? 0,
-    valor_liquido:       a.netValue             ?? a.grossValue ?? 0,
-    valor_imposto_renda: a.incomeTax            ?? null,
-    benchmark:           a.benchMark            || null,
-    indexador:           a.benchMark            || null,
-    data_vencimento:     a.maturityDate ? String(a.maturityDate).split('T')[0] : null,
-    is_liquidity:        a.isLiquidity          ?? false,
-    is_isento_ir:        a.extra?.taxFree       ?? false,
+    sub_tipo:            subTipo || null,
+    nome:                a.name || 'Sem nome',
+    ticker:              a.ticker || null,
+    isin:                a.extra?.isin || null,
+    codigo_ativo:        a.securityCode || a.ticker || null,
+    emissor:             a.name || null,
+    cnpj:                a.extra?.cnpj || null,
+    quantidade:          a.quantity ?? null,
+    preco_unitario:      a.marketPrice ?? null,
+    valor_bruto:         gross,
+    valor_liquido:       net,
+    valor_imposto_renda: a.incomeTax ?? null,
+    benchmark:           a.benchMark || null,
+    indexador:           a.benchMark || null,
+    data_vencimento:     toDateOnly(a.maturityDate),
+    is_liquidity:        a.isLiquidity ?? false,
+    is_isento_ir:        a.extra?.taxFree ?? false,
   }
 
   const frontRow = {
@@ -173,8 +239,8 @@ function parseAtivo(a: any) {
     emissor:      a.name  || null,
     ticker:       a.ticker || null,
     quantidade:   a.quantity    ?? null,
-    valorBruto:   a.grossValue  ?? 0,
-    valorLiquido: a.netValue    ?? a.grossValue ?? 0,
+    valorBruto:   gross,
+    valorLiquido: net,
     ir:           a.incomeTax   ?? null,
     benchmark:    a.benchMark   || null,
     vencimento:   a.maturityDate || null,
@@ -187,49 +253,48 @@ function parseAtivo(a: any) {
     },
   }
 
-  return { dbRow, frontRow }
+  return { dbRow, frontRow, assetClass: a.assetClass, grossValue: gross, netValue: net, subTipo, isFii, isTesouro, isCoe }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Helpers
+// Totais
 // ─────────────────────────────────────────────────────────────────────────────
 
-function calcularTotais(assets: any[]) {
-  const sum = (cls: string) =>
-    assets.filter(a => a.assetClass === cls).reduce((s, a) => s + (a.grossValue ?? 0), 0)
-
-  const sumBySubTipo = (cls: string, sub: string) =>
-    assets.filter(a => a.assetClass === cls && (resolverSubTipo(a) === sub || (a.name ?? '').toUpperCase().includes(sub)))
-          .reduce((s, a) => s + (a.grossValue ?? 0), 0)
-
-  const totalBruto  = assets.reduce((s, a) => s + (a.grossValue ?? 0), 0)
-  const totalLiquid = assets.reduce((s, a) => s + (a.netValue ?? a.grossValue ?? 0), 0)
-
-  const rv    = sum('EQUITIES')
-  const rvFii = assets.filter(a => a.assetClass === 'EQUITIES' && (a.extra?.isFII || (a.name ?? '').toUpperCase().includes('FII')))
-                       .reduce((s, a) => s + (a.grossValue ?? 0), 0)
-
-  return {
-    patrimonio_total:        totalBruto,
-    patrimonio_total_liquido: totalLiquid,
-    saldo_cc:      sum('CASH'),
-    saldo_rf:      sum('FIXED_INCOME'),
-    saldo_td:      assets.filter(a => a.assetClass === 'FIXED_INCOME' && (a.name ?? '').toUpperCase().includes('TESOURO'))
-                         .reduce((s, a) => s + (a.grossValue ?? 0), 0),
-    saldo_rv:      rv - rvFii,
-    saldo_fii:     rvFii,
-    saldo_fundos:  sum('INVESTMENT_FUND'),
-    saldo_prev:    sum('PENSION'),
-    saldo_coe:     assets.filter(a => a.assetClass === 'DERIVATIVE' && (a.name ?? '').toUpperCase().includes('COE'))
-                         .reduce((s, a) => s + (a.grossValue ?? 0), 0),
-    saldo_cripto:  sum('CRYPTO'),
-    saldo_outros:  assets
-      .filter(a => !['CASH','FIXED_INCOME','EQUITIES','INVESTMENT_FUND','PENSION','CRYPTO'].includes(a.assetClass))
-      .reduce((s, a) => s + (a.grossValue ?? 0), 0),
+function calcularTotais(parsed: ParsedXP[]) {
+  const t = {
+    patrimonio_total: 0, patrimonio_total_liquido: 0,
+    saldo_cc: 0, saldo_rf: 0, saldo_td: 0, saldo_rv: 0, saldo_fii: 0,
+    saldo_fundos: 0, saldo_prev: 0, saldo_coe: 0, saldo_cripto: 0, saldo_outros: 0,
   }
+
+  for (const p of parsed) {
+    t.patrimonio_total         += p.grossValue
+    t.patrimonio_total_liquido += p.netValue
+
+    switch (p.assetClass) {
+      case 'CASH':            t.saldo_cc += p.grossValue; break
+      case 'FIXED_INCOME':
+        t.saldo_rf += p.grossValue
+        if (p.isTesouro) t.saldo_td += p.grossValue
+        break
+      case 'EQUITIES':
+        if (p.isFii) t.saldo_fii += p.grossValue
+        else         t.saldo_rv  += p.grossValue
+        break
+      case 'INVESTMENT_FUND': t.saldo_fundos += p.grossValue; break
+      case 'PENSION':         t.saldo_prev   += p.grossValue; break
+      case 'CRYPTO':          t.saldo_cripto += p.grossValue; break
+      case 'DERIVATIVE':
+        if (p.isCoe) t.saldo_coe    += p.grossValue
+        else         t.saldo_outros += p.grossValue
+        break
+      default: t.saldo_outros += p.grossValue
+    }
+  }
+  return t
 }
 
-function resolverSubTipo(a: any): string {
+function resolverSubTipo(a: UnifiedAsset): string {
   const type = (a.extra?.productType ?? a.extra?.productCategory ?? '').toLowerCase()
   if (!type) return mapSubTipoPadrao(a.assetClass)
   if (type.includes('cdb'))                                       return 'CDB'
@@ -242,109 +307,4 @@ function resolverSubTipo(a: any): string {
   if (type.includes('fii'))                                       return 'FII'
   if (type.includes('fundo') || type.includes('fund'))            return 'FI'
   return mapSubTipoPadrao(a.assetClass)
-}
-
-function mapTipoLabel(assetClass: string): string {
-  const map: Record<string, string> = {
-    FIXED_INCOME:    'Renda Fixa',
-    INVESTMENT_FUND: 'Fundos de Investimento',
-    EQUITIES:        'Renda Variável',
-    PENSION:         'Previdência',
-    CRYPTO:          'Criptomoedas',
-    DERIVATIVE:      'Derivativos',
-    COMMODITY:       'Commodities',
-    CASH:            'Conta Corrente',
-    OTHER:           'Outros',
-  }
-  return map[assetClass] ?? assetClass
-}
-
-function mapSubTipoPadrao(assetClass: string): string {
-  const map: Record<string, string> = {
-    INVESTMENT_FUND: 'FI',
-    EQUITIES:        'AÇÃO',
-    PENSION:         'PREV',
-    CRYPTO:          'CRYPTO',
-    DERIVATIVE:      'DERIV',
-    CASH:            'CC',
-  }
-  return map[assetClass] ?? ''
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// upsertDicionario
-// ─────────────────────────────────────────────────────────────────────────────
-
-async function upsertDicionario(supabase: any, assets: any[]) {
-  const seen  = new Set<string>()
-  const rows: any[] = []
-
-  for (const a of assets) {
-    let codigo: string | null = null
-    let tipo = 'TICKER'
-
-    if (a.extra?.isin)       { codigo = a.extra.isin;   tipo = 'ISIN'   }
-    else if (a.securityCode) { codigo = a.securityCode; tipo = 'TICKER' }
-    else if (a.ticker)       { codigo = a.ticker;       tipo = 'TICKER' }
-
-    if (!codigo) continue
-    if (seen.has(codigo)) continue
-    seen.add(codigo)
-
-    rows.push({
-      codigo_identificador: codigo,
-      tipo_identificador:   tipo,
-      nome_ativo:           a.name || codigo,
-      benchmark:            a.benchMark || null,
-      instituicao_origem:   'XP',
-      classe_original:      mapTipoLabel(a.assetClass),
-      data_vencimento:      a.maturityDate ? String(a.maturityDate).split('T')[0] : null,
-      classe_avere: classifyAvere({
-        assetClass:  a.assetClass,
-        institution: 'XP',
-        maturityDate: a.maturityDate ?? null,
-        isLiquidity:  a.isLiquidity  ?? false,
-        benchMark:    a.benchMark    ?? null,
-        name:         a.name         ?? null,
-      }),
-      liquidez_avere: suggestLiquidezAvere({
-        assetClass:  a.assetClass,
-        institution: 'XP',
-        maturityDate: a.maturityDate ?? null,
-        isLiquidity:  a.isLiquidity  ?? false,
-      }),
-      vencimento_api_original: a.maturityDate ? String(a.maturityDate).split('T')[0] : null,
-      liquidez_api_original: a.isLiquidity ? '0' : null,
-    })
-  }
-
-  if (rows.length === 0) return
-
-  const { error } = await supabase
-    .from('dicionario_ativos')
-    .upsert(rows, {
-      onConflict:       'codigo_identificador,tipo_identificador',
-      ignoreDuplicates: true,
-    })
-
-  if (error) console.error('Erro ao popular dicionário XP:', error.message)
-  else console.log(`Dicionário XP: upsert de ${rows.length} ativo(s) concluído`)
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Utilities
-// ─────────────────────────────────────────────────────────────────────────────
-
-function corsHeaders() {
-  return {
-    'Access-Control-Allow-Origin':  '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  }
-}
-
-function errorResponse(message: string, status: number) {
-  return new Response(
-    JSON.stringify({ success: false, error: { message } }),
-    { status, headers: { ...corsHeaders(), 'Content-Type': 'application/json' } }
-  )
 }

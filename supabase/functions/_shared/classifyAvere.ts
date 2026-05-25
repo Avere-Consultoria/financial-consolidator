@@ -1,3 +1,5 @@
+import { parseDataFlexivel } from './dates.ts'
+
 // ─────────────────────────────────────────────────────────────────────────────
 // AVERE Default Classification — v2
 // Lógica: vencimento vs liquidez → benchmark → assetClass
@@ -151,10 +153,10 @@ export function suggestLiquidezAvere(p: {
 
   // ── Renda Fixa: calcula dias até o vencimento ──────────────────────────────
   if (assetClass === 'FIXED_INCOME') {
-    if (p.isLiquidity || !p.maturityDate) return '0'
-    const days = Math.ceil(
-      (new Date(p.maturityDate).getTime() - Date.now()) / 86_400_000
-    )
+    if (p.isLiquidity) return '0'
+    const t = parseDataFlexivel(p.maturityDate)
+    if (t == null) return null   // data ausente/inválida → master preenche
+    const days = Math.ceil((t - Date.now()) / 86_400_000)
     return String(Math.max(0, days))
   }
 

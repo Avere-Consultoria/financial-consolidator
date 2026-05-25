@@ -1,91 +1,98 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { classifyAvere, suggestLiquidezAvere } from '../_shared/classifyAvere.ts'
+import { createServiceClient } from '../_shared/supabaseClient.ts'
+import { corsHeaders, errorResponse, jsonResponse } from '../_shared/cors.ts'
+import { validarAuth, validarOwnershipCliente } from '../_shared/auth.ts'
+import { toDateOnly, todayISO } from '../_shared/dates.ts'
+import { mapTipoLabel, mapSubTipoPadrao } from '../_shared/assetClassMap.ts'
+import { fetchConsolidator, ConsolidatorError } from '../_shared/consolidator.ts'
+import {
+  resolverOuCriarCanonico,
+  sugerirCanonicoComClassificacao,
+  type Identificador,
+} from '../_shared/canonico.ts'
+import { normalizarSubTipo } from '../_shared/normalizarSubTipo.ts'
+import type { UnifiedAsset } from '../_shared/types.ts'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Edge Function: get-btg-position
 // Deploy: supabase functions deploy get-btg-position --no-verify-jwt
 // ─────────────────────────────────────────────────────────────────────────────
 
-const CONSOLIDATOR_URL = Deno.env.get('CONSOLIDATOR_URL') ?? 'http://localhost:3333'
-
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders() })
-  }
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    )
+    // ── Auth ────────────────────────────────────────────────────────────
+    const authResult = await validarAuth(req)
+    if ('error' in authResult) return authResult.error
+    const ctx = authResult.ctx
 
-    // ── Pegar accountNumber ────────────────────────────────────────────────
+    const supabase = createServiceClient()
+
     const url = new URL(req.url)
     let accountNumber = url.searchParams.get('account')
     if (!accountNumber && req.method === 'POST') {
-      const body = await req.json()
+      const body = await req.json().catch(() => ({}))
       accountNumber = body.account
     }
     if (!accountNumber) return errorResponse('Parâmetro "account" é obrigatório', 400)
 
-    // ── Chamar o consolidador ──────────────────────────────────────────────
-    console.log(`Buscando posição BTG para conta ${accountNumber}...`)
+    // ── Resolve cliente_id + autorização ───────────────────────────────
+    const { data: cliente } = await supabase
+      .from('clientes')
+      .select('id')
+      .eq('codigo_btg', accountNumber)
+      .maybeSingle()
 
-    const consolidatorRes = await fetch(
-      `${CONSOLIDATOR_URL}/api/v1/position/btg/${accountNumber}`,
-      { headers: { 'Content-Type': 'application/json' } }
-    )
+    if (!cliente) return errorResponse('Cliente não encontrado para o account informado', 404)
 
-    if (!consolidatorRes.ok) {
-      const err = await consolidatorRes.json()
-      return errorResponse(err?.error?.message ?? 'Erro no consolidador', consolidatorRes.status)
-    }
+    const ownerError = await validarOwnershipCliente(ctx, cliente.id)
+    if (ownerError) return ownerError
 
-    const { data: position } = await consolidatorRes.json()
+    console.log('Buscando posição BTG…')
+
+    const consolidatorJson = await fetchConsolidator(`/api/v1/position/btg/${accountNumber}`)
+    const position = consolidatorJson?.data
     if (!position) return errorResponse('Nenhum dado retornado pelo consolidador', 502)
 
-    const assets: any[] = position.assets ?? []
-    const today = new Date().toISOString().split('T')[0]
+    const assets: UnifiedAsset[] = position.assets ?? []
 
-    // ── Normalizar ativos em dois formatos ─────────────────────────────────
-    // dbRows   → snake_case, para persistência no Supabase
-    // frontRows → camelCase, para retorno ao BtgApi.tsx
-    const parsed = assets.map((a: any) => parseAtivo(a))
+    // Datas: positionDate vem da API (data REAL da foto); sincronização é now()
+    const dataReferencia    = toDateOnly(position.positionDate) ?? todayISO()
+    const dataSincronizacao = new Date().toISOString()
 
-    // ── Calcular totais ────────────────────────────────────────────────────
-    const totais = calcularTotais(assets)
-
-    // ── Alocação para o front ──────────────────────────────────────────────
+    const totais   = calcularTotais(assets)
     const alocacao = [
       { classe: 'Conta Corrente',         valor: totais.saldo_cc },
       { classe: 'Renda Fixa',             valor: totais.saldo_rf },
       { classe: 'Fundos de Investimento', valor: totais.saldo_fundos },
     ]
 
-    // ── Persistir no Supabase ──────────────────────────────────────────────
-    const { data: cliente } = await supabase
-      .from('clientes')
-      .select('id')
-      .eq('codigo_btg', accountNumber)
-      .single()
+    // ── Resolver canônico de cada ativo (sequencial pra evitar race) ──────
+    const parsed = []
+    for (const asset of assets) {
+      const ativoCanonicoId = await resolverCanonicoBTG(supabase, asset)
+      parsed.push(parseAtivo(asset, ativoCanonicoId))
+    }
 
+    // ── Persistir no Supabase (cliente já resolvido na autorização) ────────
     if (cliente) {
-      // 1. Upsert snapshot diário
       const { data: snapshot, error: snapError } = await supabase
         .from('posicao_btg_snapshots')
         .upsert({
-          cliente_id:       cliente.id,
-          data_referencia:  today,
-          patrimonio_total: totais.patrimonio_total,
-          saldo_cc:         totais.saldo_cc,
-          saldo_rf:         totais.saldo_rf,
-          saldo_fundos:     totais.saldo_fundos,
-          saldo_rv:         totais.saldo_rv,
-          saldo_prev:       totais.saldo_prev,
-          saldo_cripto:     totais.saldo_cripto,
-          saldo_outros:     totais.saldo_outros,
-          is_month_end:     false,
-          source:           'BTG_IAAS_V1',
+          cliente_id:         cliente.id,
+          data_referencia:    dataReferencia,
+          data_sincronizacao: dataSincronizacao,
+          patrimonio_total:   totais.patrimonio_total,
+          saldo_cc:           totais.saldo_cc,
+          saldo_rf:           totais.saldo_rf,
+          saldo_fundos:       totais.saldo_fundos,
+          saldo_rv:           totais.saldo_rv,
+          saldo_prev:         totais.saldo_prev,
+          saldo_cripto:       totais.saldo_cripto,
+          saldo_outros:       totais.saldo_outros,
+          is_month_end:       false,
+          source:             'BTG_IAAS_V1',
         }, { onConflict: 'cliente_id,data_referencia' })
         .select('id')
         .single()
@@ -93,116 +100,166 @@ Deno.serve(async (req) => {
       if (snapError || !snapshot) {
         console.error('Erro ao salvar snapshot:', snapError?.message)
       } else {
-        console.log(`Snapshot salvo — R$ ${totais.patrimonio_total.toFixed(2)}`)
-
-        // 2. Deletar ativos anteriores (cascade apaga aquisições e janelas)
-        await supabase
-          .from('posicao_btg_ativos')
-          .delete()
-          .eq('snapshot_id', snapshot.id)
-
-        // 3. Inserir cada ativo e seus filhos
-        for (const { dbRow, acquisitions, earlyTerminationSchedules } of parsed) {
-          const { data: ativoSalvo, error: ativoError } = await supabase
-            .from('posicao_btg_ativos')
-            .insert({ snapshot_id: snapshot.id, ...dbRow })
-            .select('id')
-            .single()
-
-          if (ativoError || !ativoSalvo) {
-            console.error('Erro ao salvar ativo:', ativoError?.message)
-            continue
-          }
-
-          // 4. Aquisições
-          if (acquisitions.length > 0) {
-            const bulk = acquisitions.map((acq: any) => ({
-              ativo_id:                 ativoSalvo.id,
-              acquisition_date:         acq.acquisitionDate ?? null,
-              quantity:                 acq.quantity ?? null,
-              initial_investment_value: acq.initialInvestmentValue ?? null,
-              initial_investment_qty:   acq.initialInvestmentQuantity ?? null,
-              cost_price:               acq.costPrice ?? null,
-              gross_value:              acq.grossValue ?? null,
-              net_value:                acq.netValue ?? null,
-              income_tax:               acq.incomeTax ?? null,
-              iof_tax:                  acq.iofTax ?? null,
-              yield_to_maturity:        acq.yieldToMaturity ?? null,
-              index_yield_rate:         acq.indexYieldRate ?? null,
-              fts_id:                   acq.ftsId ?? null,
-              transfer_id:              acq.transferId ?? null,
-              interface_date:           acq.interfaceDate ?? null,
-              is_virtual:               acq.isVirtual ?? false,
-            }))
-            const { error: acqError } = await supabase
-              .from('posicao_btg_aquisicoes')
-              .insert(bulk)
-            if (acqError) console.error('Erro aquisições:', acqError.message)
-          }
-
-          // 5. Janelas de liquidez
-          if (earlyTerminationSchedules.length > 0) {
-            const bulk = earlyTerminationSchedules.map((s: any) => ({
-              ativo_id:              ativoSalvo.id,
-              type:                  s.type ?? null,
-              index_rate_multiplier: s.indexRateMultiplier ?? null,
-              rate:                  s.rate ?? null,
-              from_date:             s.fromDate ?? null,
-              to_date:               s.toDate ?? null,
-            }))
-            const { error: janelaError } = await supabase
-              .from('posicao_btg_janelas_liquidez')
-              .insert(bulk)
-            if (janelaError) console.error('Erro janelas:', janelaError.message)
-          }
-        }
-
-        console.log(`${parsed.length} ativos persistidos`)
+        await persistirAtivos(supabase, snapshot.id, parsed)
       }
     } else {
-      console.warn(`Cliente não encontrado para conta BTG ${accountNumber}`)
+      console.warn('Cliente não encontrado para a conta BTG informada')
     }
 
-    // ── Popular dicionário com ativos novos ────────────────────────────────
-    await upsertDicionario(supabase, assets, 'BTG')
+    return jsonResponse({
+      patrimonioTotal: totais.patrimonio_total,
+      dataReferencia,
+      alocacao,
+      ativos: parsed.map(p => p.frontRow),
+    })
 
-    // ── Retornar ao front em camelCase (formato BtgApi.tsx) ────────────────
-    const ativos = parsed.map(({ frontRow }) => frontRow)
-
-    return new Response(
-      JSON.stringify({ patrimonioTotal: totais.patrimonio_total, dataReferencia: today, alocacao, ativos }),
-      { headers: { ...corsHeaders(), 'Content-Type': 'application/json' } }
-    )
-
-  } catch (err: any) {
-    console.error('Erro na Edge Function:', err.message)
-    return errorResponse(err.message ?? 'Erro interno', 500)
+  } catch (err: unknown) {
+    if (err instanceof ConsolidatorError) {
+      console.error('Erro no consolidador:', err.message)
+      return errorResponse(err.message, err.status)
+    }
+    console.error('Erro na Edge Function BTG:', (err as Error)?.message)
+    return errorResponse('Erro interno', 500)
   }
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
-// parseAtivo — retorna três coisas separadas:
-//   dbRow                  → snake_case para posicao_btg_ativos
-//   frontRow               → camelCase para o BtgApi.tsx
-//   acquisitions           → array para posicao_btg_aquisicoes
-//   earlyTerminationSchedules → array para posicao_btg_janelas_liquidez
+// Resolução de canônico (BTG)
+// Prioridade: ISIN > CETIP (como ISIN) > CNPJ > TICKER > security_code (como TICKER)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function parseAtivo(a: any) {
-  const ticker: string  = a.ticker ?? ''
-  const issuer: string  = a.extra?.issuer ?? ''
-  const { subTipo, codigo } = parsearTicker(ticker, a.assetClass)
-  const emissor             = issuer || a.name || ''
-  const tipoLabel           = mapTipoLabel(a.assetClass)
-  const rentabilidade       = formatRentabilidade(a)
-  const issueDate           = a.extra?.issueDate ? toDateOnly(a.extra.issueDate) : null
-  const maturityDate        = a.maturityDate ? toDateOnly(a.maturityDate) : null
+async function resolverCanonicoBTG(supabase: any, a: UnifiedAsset): Promise<string | null> {
+  const lookup: Identificador[] = coletarIdentificadoresBTG(a)
+  const principal = lookup[0]
+  if (!principal) return null
+
+  const subTipoNormalizado = normalizarSubTipo(parsearTicker(a.ticker ?? '', a.assetClass).subTipo)
+
+  return await resolverOuCriarCanonico(
+    supabase,
+    lookup,
+    sugerirCanonicoComClassificacao(a, 'BTG', { sub_tipo_canonico: subTipoNormalizado }),
+    {
+      instituicao_origem:      'BTG',
+      identificador_principal: principal,
+      nome_ativo:              a.name || '',
+      emissor_original:        a.extra?.issuer ?? null,
+      classe_original:         mapTipoLabel(a.assetClass),
+      liquidez_api_original:   a.extra?.fundLiquidity != null && a.extra?.fundLiquidity !== ''
+                                 ? String(a.extra.fundLiquidity)
+                                 : (a.isLiquidity ? '0' : null),
+      vencimento_api_original: toDateOnly(a.maturityDate),
+      index_rate:              a.indexRate ?? null,
+    },
+  )
+}
+
+function coletarIdentificadoresBTG(a: UnifiedAsset): Identificador[] {
+  const ids: Identificador[] = []
+  if (a.extra?.isin)        ids.push({ tipo: 'ISIN',   codigo: a.extra.isin })
+  if (a.extra?.cetipCode)   ids.push({ tipo: 'ISIN',   codigo: a.extra.cetipCode })
+  if (a.extra?.cnpj)        ids.push({ tipo: 'CNPJ',   codigo: a.extra.cnpj })
+  if (a.ticker)             ids.push({ tipo: 'TICKER', codigo: a.ticker })
+  if (a.securityCode)       ids.push({ tipo: 'TICKER', codigo: a.securityCode })
+  return ids
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Persistência dos ativos (bulk)
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function persistirAtivos(
+  supabase: any,
+  snapshotId: string,
+  parsed: ReturnType<typeof parseAtivo>[]
+) {
+  await supabase.from('posicao_btg_ativos').delete().eq('snapshot_id', snapshotId)
+
+  if (parsed.length === 0) return
+
+  const bulkAtivos = parsed.map(({ dbRow }) => ({ snapshot_id: snapshotId, ...dbRow }))
+  const { data: inseridos, error: ativoError } = await supabase
+    .from('posicao_btg_ativos')
+    .insert(bulkAtivos)
+    .select('id')
+
+  if (ativoError || !inseridos || inseridos.length !== parsed.length) {
+    console.error('Erro ao salvar ativos BTG:', ativoError?.message)
+    return
+  }
+
+  const aquisicoesBulk: any[] = []
+  const janelasBulk: any[] = []
+
+  parsed.forEach(({ acquisitions, earlyTerminationSchedules }, idx) => {
+    const ativoId = inseridos[idx].id
+
+    for (const acq of acquisitions) {
+      aquisicoesBulk.push({
+        ativo_id:                 ativoId,
+        acquisition_date:         acq.acquisitionDate ?? null,
+        quantity:                 acq.quantity ?? null,
+        initial_investment_value: acq.initialInvestmentValue ?? null,
+        initial_investment_qty:   acq.initialInvestmentQuantity ?? null,
+        cost_price:               acq.costPrice ?? null,
+        gross_value:              acq.grossValue ?? null,
+        net_value:                acq.netValue ?? null,
+        income_tax:               acq.incomeTax ?? null,
+        iof_tax:                  acq.iofTax ?? null,
+        yield_to_maturity:        acq.yieldToMaturity ?? null,
+        index_yield_rate:         acq.indexYieldRate ?? null,
+        fts_id:                   acq.ftsId ?? null,
+        transfer_id:              acq.transferId ?? null,
+        interface_date:           acq.interfaceDate ?? null,
+        is_virtual:               acq.isVirtual ?? false,
+      })
+    }
+
+    for (const s of earlyTerminationSchedules) {
+      janelasBulk.push({
+        ativo_id:              ativoId,
+        type:                  s.type ?? null,
+        index_rate_multiplier: s.indexRateMultiplier ?? null,
+        rate:                  s.rate ?? null,
+        from_date:             s.fromDate ?? null,
+        to_date:               s.toDate ?? null,
+      })
+    }
+  })
+
+  if (aquisicoesBulk.length > 0) {
+    const { error } = await supabase.from('posicao_btg_aquisicoes').insert(aquisicoesBulk)
+    if (error) console.error('Erro aquisições:', error.message)
+  }
+
+  if (janelasBulk.length > 0) {
+    const { error } = await supabase.from('posicao_btg_janelas_liquidez').insert(janelasBulk)
+    if (error) console.error('Erro janelas:', error.message)
+  }
+
+  console.log(`${parsed.length} ativos BTG persistidos`)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// parseAtivo
+// ─────────────────────────────────────────────────────────────────────────────
+
+function parseAtivo(a: UnifiedAsset, ativoCanonicoId: string | null) {
+  const ticker         = a.ticker ?? ''
+  const issuer         = a.extra?.issuer ?? ''
+  const { subTipo: subTipoRaw, codigo } = parsearTicker(ticker, a.assetClass)
+  const subTipo        = normalizarSubTipo(subTipoRaw) ?? subTipoRaw
+  const emissor        = issuer || a.name || ''
+  const tipoLabel      = mapTipoLabel(a.assetClass)
+  const rentabilidade  = formatRentabilidade(a)
+  const issueDate      = toDateOnly(a.extra?.issueDate)
+  const maturityDate   = toDateOnly(a.maturityDate)
 
   const acquisitions              = a.extra?.acquisitions ?? []
   const earlyTerminationSchedules = a.extra?.earlyTerminationSchedules ?? []
 
-  // ── Linha para a tabela posicao_btg_ativos (snake_case) ───────────────────
   const dbRow = {
+    ativo_canonico_id:   ativoCanonicoId,
     asset_class:         a.assetClass,
     tipo:                tipoLabel,
     sub_tipo:            subTipo || null,
@@ -238,7 +295,6 @@ function parseAtivo(a: any) {
     is_fii:              a.extra?.isFII === 'true' || a.extra?.isFII === true,
   }
 
-  // ── Objeto para o BtgApi.tsx (camelCase) ──────────────────────────────────
   const frontRow = {
     tipo:          tipoLabel,
     subTipo:       subTipo || null,
@@ -254,23 +310,23 @@ function parseAtivo(a: any) {
     benchmark:     a.benchMark ?? null,
     vencimento:    a.maturityDate ?? null,
     extra: {
-      isin:                      a.extra?.isin ?? null,
-      cetipCode:                 a.extra?.cetipCode ?? null,
-      selicCode:                 a.extra?.selicCode ?? null,
+      isin:            a.extra?.isin ?? null,
+      cetipCode:       a.extra?.cetipCode ?? null,
+      selicCode:       a.extra?.selicCode ?? null,
       issuer,
-      issuerCgeCode:             a.extra?.issuerCgeCode ?? null,
-      issueDate:                 a.extra?.issueDate ?? null,
-      issuerType:                a.extra?.issuerType ?? null,
-      taxFree:                   a.extra?.taxFree ?? false,
-      isRepo:                    a.extra?.isRepo ?? false,
-      isLiquidity:               a.isLiquidity ?? false,
-      yieldAvg:                  a.extra?.yieldAvg ?? null,
-      iofTax:                    a.extra?.iofTax ?? null,
-      priceIncomeTax:            a.extra?.priceIncomeTax ?? null,
-      priceVirtualIOF:           a.extra?.priceVirtualIOF ?? null,
-      manager:                   a.extra?.manager ?? null,
-      cnpj:                      a.extra?.cnpj ?? null,
-      fundLiquidity:             a.extra?.fundLiquidity ?? null,
+      issuerCgeCode:   a.extra?.issuerCgeCode ?? null,
+      issueDate:       a.extra?.issueDate ?? null,
+      issuerType:      a.extra?.issuerType ?? null,
+      taxFree:         a.extra?.taxFree ?? false,
+      isRepo:          a.extra?.isRepo ?? false,
+      isLiquidity:     a.isLiquidity ?? false,
+      yieldAvg:        a.extra?.yieldAvg ?? null,
+      iofTax:          a.extra?.iofTax ?? null,
+      priceIncomeTax:  a.extra?.priceIncomeTax ?? null,
+      priceVirtualIOF: a.extra?.priceVirtualIOF ?? null,
+      manager:         a.extra?.manager ?? null,
+      cnpj:            a.extra?.cnpj ?? null,
+      fundLiquidity:   a.extra?.fundLiquidity ?? null,
       acquisitions,
       earlyTerminationSchedules,
     },
@@ -280,25 +336,30 @@ function parseAtivo(a: any) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Helpers
+// Totais e helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-function calcularTotais(assets: any[]) {
-  const sum = (cls: string) =>
-    assets.filter(a => a.assetClass === cls).reduce((s, a) => s + (a.grossValue ?? 0), 0)
-
-  return {
-    patrimonio_total: assets.reduce((s, a) => s + (a.grossValue ?? 0), 0),
-    saldo_cc:         sum('CASH'),
-    saldo_rf:         sum('FIXED_INCOME'),
-    saldo_fundos:     sum('INVESTMENT_FUND'),
-    saldo_rv:         sum('EQUITIES'),
-    saldo_prev:       sum('PENSION'),
-    saldo_cripto:     sum('CRYPTO'),
-    saldo_outros:     assets
-      .filter(a => !['CASH','FIXED_INCOME','INVESTMENT_FUND','EQUITIES','PENSION','CRYPTO'].includes(a.assetClass))
-      .reduce((s, a) => s + (a.grossValue ?? 0), 0),
+function calcularTotais(assets: UnifiedAsset[]) {
+  const t = {
+    patrimonio_total: 0,
+    saldo_cc: 0, saldo_rf: 0, saldo_fundos: 0, saldo_rv: 0,
+    saldo_prev: 0, saldo_cripto: 0, saldo_outros: 0,
   }
+
+  for (const a of assets) {
+    const v = a.grossValue ?? 0
+    t.patrimonio_total += v
+    switch (a.assetClass) {
+      case 'CASH':            t.saldo_cc     += v; break
+      case 'FIXED_INCOME':    t.saldo_rf     += v; break
+      case 'INVESTMENT_FUND': t.saldo_fundos += v; break
+      case 'EQUITIES':        t.saldo_rv     += v; break
+      case 'PENSION':         t.saldo_prev   += v; break
+      case 'CRYPTO':          t.saldo_cripto += v; break
+      default:                t.saldo_outros += v
+    }
+  }
+  return t
 }
 
 function parsearTicker(ticker: string, assetClass: string): { subTipo: string; codigo: string } {
@@ -308,122 +369,10 @@ function parsearTicker(ticker: string, assetClass: string): { subTipo: string; c
   return { subTipo: ticker, codigo: '' }
 }
 
-function toDateOnly(dateStr: string): string | null {
-  if (!dateStr) return null
-  try { return new Date(dateStr).toISOString().split('T')[0] } catch { return null }
-}
-
-function formatRentabilidade(a: any): string | null {
-  const indexRate: string = a.indexRate ?? ''
-  const benchMark: string = a.benchMark ?? ''
+function formatRentabilidade(a: UnifiedAsset): string | null {
+  const indexRate = a.indexRate ?? ''
+  const benchMark = a.benchMark ?? ''
   if (indexRate && indexRate !== 'PRE' && indexRate !== benchMark) return indexRate
   if (benchMark === 'PRE' || indexRate === 'PRE') return 'PRE'
   return benchMark || null
-}
-
-function mapTipoLabel(assetClass: string): string {
-  const map: Record<string, string> = {
-    FIXED_INCOME:    'Renda Fixa',
-    INVESTMENT_FUND: 'Fundos de Investimento',
-    EQUITIES:        'Renda Variável',
-    PENSION:         'Previdência',
-    CRYPTO:          'Criptomoedas',
-    DERIVATIVE:      'Derivativos',
-    COMMODITY:       'Commodities',
-    CASH:            'Conta Corrente',
-    OTHER:           'Outros',
-  }
-  return map[assetClass] ?? assetClass
-}
-
-function mapSubTipoPadrao(assetClass: string): string {
-  const map: Record<string, string> = {
-    INVESTMENT_FUND: 'FI',
-    EQUITIES:        'AÇÃO',
-    PENSION:         'PREV',
-    CRYPTO:          'CRYPTO',
-    DERIVATIVE:      'DERIV',
-    COMMODITY:       'COMOD',
-    CASH:            'CC',
-  }
-  return map[assetClass] ?? ''
-}
-
-function corsHeaders() {
-  return {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  }
-}
-
-function errorResponse(message: string, status: number) {
-  return new Response(
-    JSON.stringify({ success: false, error: { message } }),
-    { status, headers: { ...corsHeaders(), 'Content-Type': 'application/json' } }
-  )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// upsertDicionario — insere ativos novos em dicionario_ativos (nunca sobrescreve
-// classificações já feitas pelo master)
-// ─────────────────────────────────────────────────────────────────────────────
-
-async function upsertDicionario(supabase: any, assets: any[], institution: string) {
-  const rows: any[] = []
-
-  for (const a of assets) {
-    // Escolhe o melhor identificador disponível
-    let codigo: string | null = null
-    let tipo = 'TICKER'
-    if (a.extra?.isin)       { codigo = a.extra.isin;       tipo = 'ISIN'  }
-    else if (a.extra?.cetipCode) { codigo = a.extra.cetipCode; tipo = 'ISIN'  }
-    else if (a.extra?.cnpj)  { codigo = a.extra.cnpj;       tipo = 'CNPJ'  }
-    else if (a.ticker)       { codigo = a.ticker;            tipo = 'TICKER'}
-    else if (a.securityCode) { codigo = a.securityCode;      tipo = 'TICKER'}
-    if (!codigo) continue
-
-    rows.push({
-      codigo_identificador: codigo,
-      tipo_identificador:   tipo,
-      nome_ativo:           a.name || codigo,
-      benchmark:            a.benchMark || a.indexRate || null,
-      instituicao_origem:   institution,
-      classe_original:      mapTipoLabel(a.assetClass),
-      data_vencimento: a.maturityDate ? String(a.maturityDate).split('T')[0] : null,
-      classe_avere: classifyAvere({
-        assetClass:  a.assetClass,
-        institution,
-        maturityDate: a.maturityDate ?? null,
-        isLiquidity:  a.isLiquidity  ?? false,
-        benchMark:    a.benchMark    ?? null,
-        indexRate:    a.indexRate    ?? null,
-        subTipo:      parsearTicker(a.ticker ?? '', a.assetClass).subTipo || null,
-        name:         a.name         ?? null,
-        isFII:        a.extra?.isFII === 'true' || a.extra?.isFII === true,
-      }),
-      liquidez_avere: suggestLiquidezAvere({
-        assetClass:    a.assetClass,
-        institution,
-        maturityDate:  a.maturityDate        ?? null,
-        isLiquidity:   a.isLiquidity         ?? false,
-        fundLiquidity: a.extra?.fundLiquidity ?? null,
-      }),
-      vencimento_api_original: a.maturityDate ? String(a.maturityDate).split('T')[0] : null,
-      liquidez_api_original: (a.extra?.fundLiquidity != null && a.extra?.fundLiquidity !== '')
-        ? String(a.extra.fundLiquidity)
-        : (a.isLiquidity ? '0' : null),
-    })
-  }
-
-  if (rows.length === 0) return
-
-  const { error } = await supabase
-    .from('dicionario_ativos')
-    .upsert(rows, {
-      onConflict:       'codigo_identificador,tipo_identificador',
-      ignoreDuplicates: true,
-    })
-
-  if (error) console.error('Erro ao popular dicionário BTG:', error.message)
-  else console.log(`Dicionário BTG: upsert de ${rows.length} ativo(s) concluído`)
 }
