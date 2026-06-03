@@ -31,6 +31,7 @@ function mapInstrumentType(code: string): AssetClass {
   };
   return map[code] ?? 'OTHER';
 }
+// No arquivo src/connectors/agora/consolidatedPosition.ts
 async function agoraRequest(path: string): Promise<any> {
   const url = `${getAgoraBaseUrl()}${path}`;
   const headers = await getAgoraHeaders();
@@ -57,6 +58,10 @@ export async function getAgoraConsolidatedPosition(
       `${getBasePath()}/listsummary/${cpfCnpj}/${accountCode}`
     );
 
+    // 🚩 INSIRA OS LOGS AQUI PARA VER O QUE O BRADESCO MANDOU:
+    logger.info("=== DEBUG DATA BRUTA ===");
+    logger.info(JSON.stringify(data));
+
     // Sandbox retorna "allocation", produção retorna "result.products"
     const allocation = data?.allocation ?? {};
     const products = data?.result?.products ?? {};
@@ -64,6 +69,7 @@ export async function getAgoraConsolidatedPosition(
     const classMap: Record<string, AssetClass> = {
       // sandbox keys
       equity:           'EQUITIES',
+      
       fixedIncome:      'FIXED_INCOME',
       multimarket:      'INVESTMENT_FUND',
       collateral:       'OTHER',
