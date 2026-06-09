@@ -1,5 +1,6 @@
 import { classifyAvere, suggestLiquidezAvere } from './classifyAvere.ts'
 import { normalizarSubTipo } from './normalizarSubTipo.ts'
+import { formatarTaxa } from './formatarTaxa.ts'
 import type { Institution } from './types.ts'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -32,6 +33,7 @@ export interface CanonicoSugerido {
   liquidez_avere:     string | null
   data_vencimento:    string | null
   taxa_canonica:      string | null
+  taxa_formatada:     string | null
   benchmark_canonico: string | null
   sub_tipo_canonico:  string | null
   is_fii:             boolean
@@ -97,6 +99,7 @@ export async function resolverOuCriarCanonico(
         liquidez_avere:     sugestao.liquidez_avere,
         data_vencimento:    sugestao.data_vencimento,
         taxa_canonica:      sugestao.taxa_canonica,
+        taxa_formatada:     sugestao.taxa_formatada,
         benchmark_canonico: sugestao.benchmark_canonico,
         sub_tipo_canonico:  sugestao.sub_tipo_canonico,
         is_fii:             sugestao.is_fii,
@@ -112,6 +115,18 @@ export async function resolverOuCriarCanonico(
     ativoCanonicoId = novo.id
   }
 
+  // ── 2b. Enriquece taxa_formatada de canônico EXISTENTE quando esta visão
+  //        traz o cupom (TAXA + CUPOM). Só preenche quando o atual ainda não
+  //        tem cupom — nunca rebaixa um valor já rico. (campo derivado, não
+  //        editado no Master, então é seguro atualizar pelo sync.)
+  if (ativoCanonicoId && sugestao.taxa_formatada && /a\.a\./.test(sugestao.taxa_formatada)) {
+    await supabase
+      .from('ativos_canonicos')
+      .update({ taxa_formatada: sugestao.taxa_formatada })
+      .eq('id', ativoCanonicoId)
+      .or('taxa_formatada.is.null,taxa_formatada.not.ilike.*a.a.*')
+  }
+
   // ── 3. Garante linha do dicionario_ativos para essa visão institucional ─
   const { error: errUpsert } = await supabase
     .from('dicionario_ativos')
@@ -125,6 +140,7 @@ export async function resolverOuCriarCanonico(
       liquidez_api_original:     visao.liquidez_api_original,
       vencimento_api_original:   visao.vencimento_api_original,
       index_rate:                visao.index_rate,
+      taxa_formatada:            sugestao.taxa_formatada,
       ativo_canonico_id:         ativoCanonicoId,
     }, {
       onConflict: 'instituicao_origem,codigo_identificador,tipo_identificador',
@@ -192,12 +208,22 @@ export function sugerirCanonicoComClassificacao(
     fundLiquidity: asset.extra?.fundLiquidity ?? null,
   })
 
+  // Taxa pronta p/ exibição (TAXA + CUPOM), igual à Home. Best-effort: usa os
+  // campos padrão do UnifiedAsset; onde não há cupom, cai no índice (sem regressão).
+  const rentabilidade = asset.indexRate ?? asset.benchMark ?? asset.extra?.bondRate ?? null
+  const taxaFormatada = formatarTaxa(
+    rentabilidade,
+    asset.benchMark ?? asset.indexRate ?? null,
+    asset.extra?.yieldAvg ?? null,
+  ) ?? (asset.benchMark ?? asset.indexRate ?? asset.extra?.bondRate ?? null)
+
   return {
     nome_canonico:      asset.name || 'Ativo sem nome',
     classe_avere:       classe ?? null,
     liquidez_avere:     liquidez ?? null,
     data_vencimento:    asset.maturityDate ? String(asset.maturityDate).split('T')[0] : null,
     taxa_canonica:      asset.benchMark ?? asset.extra?.bondRate ?? null,
+    taxa_formatada:     taxaFormatada,
     benchmark_canonico: asset.benchMark ?? asset.indexRate ?? null,
     sub_tipo_canonico:  null,
     is_fii:             isFii,

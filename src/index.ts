@@ -32,6 +32,20 @@ app.get('/health', (_req, res) => {
   });
 });
 
+// ─── Auth: segredo compartilhado com as edge functions do Supabase ──────────────
+// Tudo abaixo (as rotas /api/v1) exige o header x-api-key. O /health acima fica livre.
+const CONSOLIDATOR_SECRET = process.env.CONSOLIDATOR_SECRET;
+if (!CONSOLIDATOR_SECRET) {
+  logger.warn('⚠️  CONSOLIDATOR_SECRET não configurado — canal SEM proteção (defina a env var).');
+}
+app.use((req, res, next) => {
+  if (!CONSOLIDATOR_SECRET) return next(); // tolerante durante a transição (sem env)
+  if (req.get('x-api-key') !== CONSOLIDATOR_SECRET) {
+    return res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } });
+  }
+  next();
+});
+
 // ─── Rotas ─────────────────────────────────────────────────────────────────────
 app.use('/api/v1/position', positionRoutes);
 app.use('/api/v1/agora', agoraRoutes);

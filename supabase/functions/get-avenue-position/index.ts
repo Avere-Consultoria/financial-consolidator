@@ -11,6 +11,7 @@ import {
   type CanonicoSugerido,
 } from '../_shared/canonico.ts'
 import { normalizarSubTipo } from '../_shared/normalizarSubTipo.ts'
+import { resolverContaPorId, resolverContaPrimaria } from '../_shared/contas.ts'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Edge Function: get-avenue-position
@@ -27,19 +28,18 @@ Deno.serve(async (req) => {
 
     const supabase = createServiceClient()
 
-    const { clientId } = await req.json().catch(() => ({}))
-    if (!clientId) return errorResponse('clientId é obrigatório', 400)
+    const { clientId, contaId } = await req.json().catch(() => ({}))
+    if (!clientId && !contaId) return errorResponse('clientId ou contaId é obrigatório', 400)
 
-    const ownerError = await validarOwnershipCliente(ctx, clientId)
+    // Resolve a CONTA Avenue (por contaId ou conta primária do cliente)
+    const conta = contaId
+      ? await resolverContaPorId(supabase, contaId)
+      : await resolverContaPrimaria(supabase, 'AVENUE', clientId)
+    if (!conta) return errorResponse('Conta Avenue não encontrada', 404)
+    if (!conta.codigo) return errorResponse('Código Avenue não encontrado', 404)
+
+    const ownerError = await validarOwnershipCliente(ctx, conta.cliente_id)
     if (ownerError) return ownerError
-
-    const { data: cliente } = await supabase
-      .from('clientes')
-      .select('id, codigo_avenue')
-      .eq('id', clientId)
-      .single()
-
-    if (!cliente?.codigo_avenue) return errorResponse('Código Avenue não encontrado', 404)
 
     // Avenue trabalha com data alvo (custódia fechada — D-4)
     const dateObj = new Date()
@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
     const dataSincronizacao = new Date().toISOString()
 
     const rawJson = await fetchConsolidator(
-      `/api/v1/avenue/auc?date=${targetDate}&cpf=${cliente.codigo_avenue}`,
+      `/api/v1/avenue/auc?date=${targetDate}&cpf=${conta.codigo}`,
       { method: 'GET' }
     )
     const aucData: any[] = Array.isArray(rawJson?.data) ? rawJson.data : []
@@ -67,7 +67,8 @@ Deno.serve(async (req) => {
     const { data: snapshot, error: snapError } = await supabase
       .from('posicao_avenue_snapshots')
       .upsert({
-        cliente_id:         clientId,
+        cliente_id:         conta.cliente_id,
+        conta_id:           conta.id,
         data_referencia:    targetDate,
         data_sincronizacao: dataSincronizacao,
         patrimonio_total:   totais.patrimonio_total,
@@ -79,7 +80,7 @@ Deno.serve(async (req) => {
         saldo_cripto:       totais.saldo_cripto,
         saldo_outros:       totais.saldo_outros,
         source:             'AVENUE_CONSOLIDATOR_V1',
-      }, { onConflict: 'cliente_id,data_referencia' })
+      }, { onConflict: 'cliente_id,conta_id,data_referencia' })
       .select('id')
       .single()
 
@@ -153,6 +154,7 @@ async function resolverCanonicoAvenue(supabase: any, item: any): Promise<string 
     }),
     data_vencimento:    toDateOnly(item.maturityDate),
     taxa_canonica:      null,
+    taxa_formatada:     null,
     benchmark_canonico: null,
     sub_tipo_canonico:  normalizarSubTipo(productType),
     is_fii:             detectarIsFii(item.productName),

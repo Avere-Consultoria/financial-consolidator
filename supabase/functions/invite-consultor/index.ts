@@ -2,36 +2,78 @@ import { createServiceClient } from '../_shared/supabaseClient.ts'
 import { corsHeaders, errorResponse, jsonResponse } from '../_shared/cors.ts'
 import { validarAuth, exigirMaster } from '../_shared/auth.ts'
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Provisiona o ACESSO de um consultor já cadastrado, de forma atômica e sem
+// depender de SMTP:
+//   1. cria o usuário de login (email_confirm = true) com senha temporária;
+//   2. cria/atualiza a linha em `perfis` (id = uid, role);
+//   3. vincula `consultores.perfil_id = uid`.
+// Em qualquer falha, faz rollback do que já criou. Devolve a senha p/ o master
+// repassar ao consultor. Somente MASTER pode executar.
+// ─────────────────────────────────────────────────────────────────────────────
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
-    // ── Auth: somente MASTER pode convidar ──────────────────────────────
     const authResult = await validarAuth(req)
     if ('error' in authResult) return authResult.error
-    const ctx = authResult.ctx
-
-    const masterError = exigirMaster(ctx)
+    const masterError = exigirMaster(authResult.ctx)
     if (masterError) return masterError
 
-    const { consultor_id, email, nome } = await req.json().catch(() => ({}))
-
-    if (!email || !consultor_id) {
-      return errorResponse('email e consultor_id são obrigatórios', 400)
+    const { consultor_id, email, nome, senha, role } = await req.json().catch(() => ({}))
+    if (!consultor_id || !email || !senha) {
+      return errorResponse('consultor_id, email e senha são obrigatórios', 400)
+    }
+    if (String(senha).length < 8) {
+      return errorResponse('A senha temporária deve ter ao menos 8 caracteres', 400)
     }
 
-    const supabaseAdmin = createServiceClient()
+    const admin = createServiceClient()
 
-    const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-      data: { consultor_id, nome },
+    // 1. Usuário de login (idempotente): cria; se já existir, redefine a senha.
+    let uid: string
+    const { data: created, error: errCreate } = await admin.auth.admin.createUser({
+      email,
+      password: senha,
+      email_confirm: true,
+      user_metadata: { nome },
     })
-
-    if (error) {
-      console.error('inviteUserByEmail error:', error.message)
-      return errorResponse(error.message, error.status ?? 400)
+    const criadoAgora = !!created?.user
+    if (created?.user) {
+      uid = created.user.id
+    } else {
+      // Já existe (ou criação falhou) → localiza pelo e-mail e redefine a senha.
+      const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
+      const existente = list?.users?.find((u: any) => (u.email ?? '').toLowerCase() === String(email).toLowerCase())
+      if (!existente) {
+        return errorResponse(errCreate?.message ?? 'Falha ao criar usuário de login', 400)
+      }
+      uid = existente.id
+      const { error: errUpd } = await admin.auth.admin.updateUserById(uid, { password: senha, email_confirm: true })
+      if (errUpd) return errorResponse(`Falha ao redefinir senha: ${errUpd.message}`, 400)
     }
 
-    return jsonResponse({ success: true, user_id: data.user.id })
+    // 2. Perfil (id = uid). upsert para robustez caso exista trigger de signup.
+    const { error: errPerfil } = await admin.from('perfis').upsert(
+      { id: uid, email, nome: nome ?? null, role: role ?? 'CONSULTOR' },
+      { onConflict: 'id' },
+    )
+    if (errPerfil) {
+      if (criadoAgora) await admin.auth.admin.deleteUser(uid)
+      return errorResponse(`Falha ao criar perfil: ${errPerfil.message}`, 400)
+    }
+
+    // 3. Vínculo consultor ↔ login
+    const { error: errLink } = await admin.from('consultores')
+      .update({ perfil_id: uid })
+      .eq('id', consultor_id)
+    if (errLink) {
+      if (criadoAgora) { await admin.from('perfis').delete().eq('id', uid); await admin.auth.admin.deleteUser(uid) }
+      return errorResponse(`Falha ao vincular consultor: ${errLink.message}`, 400)
+    }
+
+    return jsonResponse({ success: true, user_id: uid, email, senha })
 
   } catch (err: unknown) {
     console.error('invite-consultor erro:', (err as Error)?.message)

@@ -11,6 +11,7 @@ import {
   type Identificador,
 } from '../_shared/canonico.ts'
 import { normalizarSubTipo } from '../_shared/normalizarSubTipo.ts'
+import { resolverContaPorId, resolverContaPorCodigo } from '../_shared/contas.ts'
 import type { UnifiedAsset } from '../_shared/types.ts'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -31,22 +32,23 @@ Deno.serve(async (req) => {
 
     const url = new URL(req.url)
     let accountNumber = url.searchParams.get('account')
-    if (!accountNumber && req.method === 'POST') {
+    let contaId: string | null = null
+    if (req.method === 'POST') {
       const body = await req.json().catch(() => ({}))
-      accountNumber = body.account
+      accountNumber = accountNumber ?? body.account
+      contaId = body.contaId ?? null
     }
-    if (!accountNumber) return errorResponse('Parâmetro "account" é obrigatório', 400)
 
-    // ── Resolve cliente_id + autorização ───────────────────────────────
-    const { data: cliente } = await supabase
-      .from('clientes')
-      .select('id')
-      .eq('codigo_btg', accountNumber)
-      .maybeSingle()
+    // ── Resolve a CONTA (por contaId ou pelo nº da conta) + autorização ──
+    const conta = contaId
+      ? await resolverContaPorId(supabase, contaId)
+      : (accountNumber ? await resolverContaPorCodigo(supabase, 'BTG', accountNumber) : null)
+    if (!conta) return errorResponse('Conta BTG não encontrada (informe account ou contaId)', 404)
 
-    if (!cliente) return errorResponse('Cliente não encontrado para o account informado', 404)
+    accountNumber = conta.codigo
+    if (!accountNumber) return errorResponse('Conta BTG sem número cadastrado', 400)
 
-    const ownerError = await validarOwnershipCliente(ctx, cliente.id)
+    const ownerError = await validarOwnershipCliente(ctx, conta.cliente_id)
     if (ownerError) return ownerError
 
     console.log('Buscando posição BTG…')
@@ -75,12 +77,13 @@ Deno.serve(async (req) => {
       parsed.push(parseAtivo(asset, ativoCanonicoId))
     }
 
-    // ── Persistir no Supabase (cliente já resolvido na autorização) ────────
-    if (cliente) {
+    // ── Persistir no Supabase (conta já resolvida na autorização) ──────────
+    {
       const { data: snapshot, error: snapError } = await supabase
         .from('posicao_btg_snapshots')
         .upsert({
-          cliente_id:         cliente.id,
+          cliente_id:         conta.cliente_id,
+          conta_id:           conta.id,
           data_referencia:    dataReferencia,
           data_sincronizacao: dataSincronizacao,
           patrimonio_total:   totais.patrimonio_total,
@@ -93,7 +96,7 @@ Deno.serve(async (req) => {
           saldo_outros:       totais.saldo_outros,
           is_month_end:       false,
           source:             'BTG_IAAS_V1',
-        }, { onConflict: 'cliente_id,data_referencia' })
+        }, { onConflict: 'cliente_id,conta_id,data_referencia' })
         .select('id')
         .single()
 
@@ -102,8 +105,6 @@ Deno.serve(async (req) => {
       } else {
         await persistirAtivos(supabase, snapshot.id, parsed)
       }
-    } else {
-      console.warn('Cliente não encontrado para a conta BTG informada')
     }
 
     return jsonResponse({

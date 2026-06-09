@@ -155,11 +155,27 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── Upsert snapshot (cliente + instituicao + data) ─────────────────────
+    // ── Resolve a CONTA (multi-conta): por codigo_conta, senão a primária ──
+    let contaId: string | null = null
+    const { data: instRow } = await supabase
+      .from('instituicoes').select('id').eq('nome', instituicao).maybeSingle()
+    if (instRow?.id) {
+      let q = supabase
+        .from('cliente_contas').select('id, ordem')
+        .eq('cliente_id', cliente.id).eq('instituicao_id', instRow.id)
+      if (snapshot.codigo_conta != null && String(snapshot.codigo_conta).trim() !== '') {
+        q = q.eq('codigo', String(snapshot.codigo_conta).trim())
+      }
+      const { data: contaRows } = await q.order('ordem', { ascending: true }).limit(1)
+      contaId = contaRows?.[0]?.id ?? null
+    }
+
+    // ── Upsert snapshot (cliente + conta + data) ───────────────────────────
     const { data: snap, error: snapErr } = await supabase
       .from('posicao_manual_snapshots')
       .upsert({
         cliente_id:         cliente.id,
+        conta_id:           contaId,
         instituicao:        instituicao,
         data_referencia:    dataReferencia,
         data_sincronizacao: new Date().toISOString(),
@@ -173,7 +189,7 @@ Deno.serve(async (req) => {
         saldo_outros:       snapshot.saldo_outros ?? null,
         is_month_end:       snapshot.is_month_end ?? false,
         source:             snapshot.source ?? 'PDF_MANUAL',
-      }, { onConflict: 'cliente_id,instituicao,data_referencia' })
+      }, { onConflict: 'cliente_id,conta_id,data_referencia' })
       .select('id')
       .single()
 

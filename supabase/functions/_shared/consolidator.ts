@@ -27,12 +27,17 @@ export async function fetchConsolidator(
 ): Promise<any> {
   const { timeoutMs = DEFAULT_TIMEOUT_MS, ...rest } = init
   const url = `${getConsolidatorUrl()}${path}`
+  const secret = Deno.env.get('CONSOLIDATOR_SECRET')
 
   let res: Response
   try {
     res = await fetch(url, {
       ...rest,
-      headers: { 'Content-Type': 'application/json', ...(rest.headers ?? {}) },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(secret ? { 'x-api-key': secret } : {}),
+        ...(rest.headers ?? {}),
+      },
       signal: AbortSignal.timeout(timeoutMs),
     })
   } catch (err: unknown) {

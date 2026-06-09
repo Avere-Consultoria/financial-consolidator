@@ -10,6 +10,7 @@ import {
   type Identificador,
 } from '../_shared/canonico.ts'
 import { normalizarSubTipo } from '../_shared/normalizarSubTipo.ts'
+import { resolverContaPorId, resolverContaPorCodigo, resolverContaPrimaria } from '../_shared/contas.ts'
 import type { UnifiedAsset } from '../_shared/types.ts'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -27,15 +28,24 @@ Deno.serve(async (req) => {
 
     const supabase = createServiceClient()
 
-    const { cpfCnpj, accountCode, clientId } = await req.json().catch(() => ({}))
-    if (!cpfCnpj || !accountCode || !clientId) {
-      return errorResponse('cpfCnpj, accountCode e clientId são obrigatórios', 400)
-    }
+    const { cpfCnpj, accountCode, clientId, contaId } = await req.json().catch(() => ({}))
 
-    const ownerError = await validarOwnershipCliente(ctx, clientId)
+    // ── Resolve a CONTA Ágora (por contaId, pela conta/accountCode ou primária) ──
+    let conta = null
+    if (contaId) conta = await resolverContaPorId(supabase, contaId)
+    else if (accountCode) conta = await resolverContaPorCodigo(supabase, 'AGORA', accountCode)
+    else if (clientId) conta = await resolverContaPrimaria(supabase, 'AGORA', clientId)
+    if (!conta) return errorResponse('Conta Ágora não encontrada (informe contaId, accountCode ou clientId)', 404)
+
+    // Documento (CPF/CNPJ) + conta vêm da cadastro; fallback ao que veio no body.
+    const doc = conta.documento ?? cpfCnpj
+    const acc = conta.codigo ?? accountCode
+    if (!doc || !acc) return errorResponse('Documento (CPF/CNPJ) e conta da Ágora são obrigatórios', 400)
+
+    const ownerError = await validarOwnershipCliente(ctx, conta.cliente_id)
     if (ownerError) return ownerError
 
-    const payload = await fetchConsolidator(`/api/v1/position/agora/${cpfCnpj}/${accountCode}`, { method: 'GET' })
+    const payload = await fetchConsolidator(`/api/v1/position/agora/${doc}/${acc}`, { method: 'GET' })
     const data = payload?.data || payload
 
     if (!data?.totalAmount) return errorResponse('Consolidador não retornou patrimônio', 502)
@@ -58,7 +68,8 @@ Deno.serve(async (req) => {
     const { data: snapshot, error: snapError } = await supabase
       .from('posicao_agora_snapshots')
       .upsert({
-        cliente_id:         clientId,
+        cliente_id:         conta.cliente_id,
+        conta_id:           conta.id,
         data_referencia:    dataReferencia,
         data_sincronizacao: dataSincronizacao,
         patrimonio_total:   totais.patrimonio_total,
@@ -67,7 +78,7 @@ Deno.serve(async (req) => {
         saldo_fundos:       totais.saldo_fundos,
         saldo_caixa:        totais.saldo_caixa,
         source:             'AGORA_API'
-      }, { onConflict: 'cliente_id,data_referencia' })
+      }, { onConflict: 'cliente_id,conta_id,data_referencia' })
       .select('id')
       .single()
 

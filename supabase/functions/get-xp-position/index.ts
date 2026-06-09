@@ -10,6 +10,7 @@ import {
   type Identificador,
 } from '../_shared/canonico.ts'
 import { normalizarSubTipo } from '../_shared/normalizarSubTipo.ts'
+import { resolverContaPorId, resolverContaPorCodigo } from '../_shared/contas.ts'
 import type { UnifiedAsset } from '../_shared/types.ts'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -30,26 +31,23 @@ Deno.serve(async (req) => {
 
     const url = new URL(req.url)
     let accountNumber = url.searchParams.get('account')
-    let clientId      = url.searchParams.get('clientId')
+    let contaId: string | null = null
 
     if (req.method === 'POST') {
-      const body    = await req.json().catch(() => ({}))
+      const body = await req.json().catch(() => ({}))
       accountNumber = accountNumber ?? body.account
-      clientId      = clientId      ?? body.clientId
+      contaId = body.contaId ?? null
     }
 
-    if (!accountNumber) return errorResponse('Parâmetro "account" é obrigatório', 400)
+    // ── Resolve a CONTA (por contaId ou pelo nº da conta) + autorização ──
+    const conta = contaId
+      ? await resolverContaPorId(supabase, contaId)
+      : (accountNumber ? await resolverContaPorCodigo(supabase, 'XP', accountNumber) : null)
+    if (!conta) return errorResponse('Conta XP não encontrada (informe account ou contaId)', 404)
 
-    // ── Resolve cliente_id + autorização ───────────────────────────────
-    if (!clientId) {
-      const { data: cliente } = await supabase
-        .from('clientes')
-        .select('id')
-        .eq('codigo_xp', accountNumber)
-        .maybeSingle()
-      clientId = cliente?.id ?? null
-    }
-    if (!clientId) return errorResponse('Cliente não encontrado para o account informado', 404)
+    const clientId = conta.cliente_id
+    accountNumber = conta.codigo
+    if (!accountNumber) return errorResponse('Conta XP sem número cadastrado', 400)
 
     const ownerError = await validarOwnershipCliente(ctx, clientId)
     if (ownerError) return ownerError
@@ -79,6 +77,7 @@ Deno.serve(async (req) => {
         .from('posicao_xp_snapshots')
         .upsert({
           cliente_id:               clientId,
+          conta_id:                 conta.id,
           data_referencia:          dataReferencia,
           data_sincronizacao:       dataSincronizacao,
           patrimonio_total:         totais.patrimonio_total,
@@ -95,7 +94,7 @@ Deno.serve(async (req) => {
           is_month_end:             false,
           source:                   'XP_DATA_ACCESS_V1',
           dado_atualizado:          true,
-        }, { onConflict: 'cliente_id,data_referencia' })
+        }, { onConflict: 'cliente_id,conta_id,data_referencia' })
         .select('id')
         .single()
 
