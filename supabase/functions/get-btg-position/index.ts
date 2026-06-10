@@ -11,7 +11,7 @@ import {
   type Identificador,
 } from '../_shared/canonico.ts'
 import { normalizarSubTipo } from '../_shared/normalizarSubTipo.ts'
-import { resolverContaPorId, resolverContaPorCodigo } from '../_shared/contas.ts'
+import { resolverContaPorId, resolverContaPorCodigo, marcarSync } from '../_shared/contas.ts'
 import type { UnifiedAsset } from '../_shared/types.ts'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -106,6 +106,8 @@ Deno.serve(async (req) => {
         await persistirAtivos(supabase, snapshot.id, parsed)
       }
     }
+
+    await marcarSync(supabase, conta.id, 'ok')
 
     return jsonResponse({
       patrimonioTotal: totais.patrimonio_total,

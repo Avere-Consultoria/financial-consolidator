@@ -1,5 +1,6 @@
 import { createServiceClient } from '../_shared/supabaseClient.ts'
 import { corsHeaders, errorResponse, jsonResponse } from '../_shared/cors.ts'
+import { validarAuth, exigirMaster } from '../_shared/auth.ts'
 import {
     criarResolver, SUBTIPOS_BANCARIO_FGC, SUBTIPOS_CREDITO_PRIVADO,
 } from '../_shared/matchRisco.ts'
@@ -17,6 +18,11 @@ import {
 
 Deno.serve(async (req) => {
     if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+
+    const authResult = await validarAuth(req)
+    if ('error' in authResult) return authResult.error
+    const masterError = exigirMaster(authResult.ctx)
+    if (masterError) return masterError
 
     let force = false
     try { const b = await req.clone().json(); force = b?.force === true } catch { /* */ }

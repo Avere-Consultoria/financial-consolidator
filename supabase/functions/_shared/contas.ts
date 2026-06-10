@@ -14,6 +14,15 @@ export interface ContaResolvida {
     documento: string | null;
 }
 
+// Carimba o estado de sincronização da conta (best-effort; nunca quebra o sync).
+export async function marcarSync(supabase: any, contaId: string, status: 'ok' | 'erro', erro: string | null = null): Promise<void> {
+    try {
+        await supabase.from('cliente_contas')
+            .update({ ultima_sync: new Date().toISOString(), ultimo_status: status, ultimo_erro: erro })
+            .eq('id', contaId);
+    } catch (_e) { /* não interrompe o fluxo principal */ }
+}
+
 export async function resolverContaPorId(supabase: any, contaId: string): Promise<ContaResolvida | null> {
     const { data } = await supabase
         .from('cliente_contas')

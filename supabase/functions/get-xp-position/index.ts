@@ -10,7 +10,7 @@ import {
   type Identificador,
 } from '../_shared/canonico.ts'
 import { normalizarSubTipo } from '../_shared/normalizarSubTipo.ts'
-import { resolverContaPorId, resolverContaPorCodigo } from '../_shared/contas.ts'
+import { resolverContaPorId, resolverContaPorCodigo, marcarSync } from '../_shared/contas.ts'
 import type { UnifiedAsset } from '../_shared/types.ts'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -125,6 +125,8 @@ Deno.serve(async (req) => {
       { classe: 'COE',                    valor: totais.saldo_coe     },
       { classe: 'Outros',                 valor: totais.saldo_outros  },
     ].filter(a => a.valor > 0)
+
+    await marcarSync(supabase, conta.id, 'ok')
 
     return jsonResponse({
       patrimonioTotal:        totais.patrimonio_total,

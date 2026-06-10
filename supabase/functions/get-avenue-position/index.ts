@@ -11,7 +11,7 @@ import {
   type CanonicoSugerido,
 } from '../_shared/canonico.ts'
 import { normalizarSubTipo } from '../_shared/normalizarSubTipo.ts'
-import { resolverContaPorId, resolverContaPrimaria } from '../_shared/contas.ts'
+import { resolverContaPorId, resolverContaPrimaria, marcarSync } from '../_shared/contas.ts'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Edge Function: get-avenue-position
@@ -96,6 +96,8 @@ Deno.serve(async (req) => {
       const { error: insError } = await supabase.from('posicao_avenue_ativos').insert(bulkAtivos)
       if (insError) console.error('Erro ao salvar ativos Avenue:', insError.message)
     }
+
+    await marcarSync(supabase, conta.id, 'ok')
 
     return jsonResponse({
       patrimonioTotal:    totais.patrimonio_total,

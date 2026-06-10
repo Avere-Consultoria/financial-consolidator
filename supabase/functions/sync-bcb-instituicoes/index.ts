@@ -8,6 +8,7 @@
 //   IFDATA: IfDataCadastro(AnoMes=...)
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { validarAuth, exigirMaster } from '../_shared/auth.ts';
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -113,6 +114,11 @@ interface BcbInst {
 
 Deno.serve(async (req: Request) => {
     if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+
+    const authResult = await validarAuth(req);
+    if ('error' in authResult) return authResult.error;
+    const masterError = exigirMaster(authResult.ctx);
+    if (masterError) return masterError;
 
     // debug mode (?debug=1 ou body {debug:true}) → não grava, devolve estatísticas
     let debug = new URL(req.url).searchParams.get('debug') === '1';

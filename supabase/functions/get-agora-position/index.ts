@@ -10,7 +10,7 @@ import {
   type Identificador,
 } from '../_shared/canonico.ts'
 import { normalizarSubTipo } from '../_shared/normalizarSubTipo.ts'
-import { resolverContaPorId, resolverContaPorCodigo, resolverContaPrimaria } from '../_shared/contas.ts'
+import { resolverContaPorId, resolverContaPorCodigo, resolverContaPrimaria, marcarSync } from '../_shared/contas.ts'
 import type { UnifiedAsset } from '../_shared/types.ts'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -180,6 +180,8 @@ Deno.serve(async (req) => {
         }
       }
     }
+
+    await marcarSync(supabase, conta.id, 'ok')
 
     return jsonResponse({ success: true, data })
 
