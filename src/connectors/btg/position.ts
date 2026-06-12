@@ -265,12 +265,37 @@ function mapBtgPosition(raw: any, accountNumber: string): UnifiedPosition {
 
   // ── Caixa ───────────────────────────────────────────────────────────────────
   for (const cashItem of raw.Cash ?? []) {
+    // Conta corrente = saldo parado (o BTG ainda soma o CashInvested aqui no
+    // SummaryAccounts, mas mantemos separado para a CC refletir só o saldo real).
     if (cashItem.CurrentAccount?.Value) {
       assets.push({
         assetClass: 'CASH',
         name: 'Conta Corrente',
         grossValue: parseFloat(cashItem.CurrentAccount.Value),
         netValue: parseFloat(cashItem.CurrentAccount.Value),
+      });
+    }
+
+    // Caixa investido (aplicação automática de liquidez, ex.: "CDIE") — entra
+    // como posição própria de liquidez diária; sem isso o patrimônio total fica
+    // a menos do valor aplicado.
+    for (const ci of cashItem.CashInvested ?? []) {
+      assets.push({
+        assetClass: 'FIXED_INCOME',
+        name: ci.Name?.Nome ?? 'Caixa Investido',
+        securityCode: ci.Name?.CodAtivo ?? null,
+        quantity: parseFloat(ci.Quantity ?? '0'),
+        grossValue: parseFloat(ci.GrossValue ?? '0'),
+        netValue: parseFloat(ci.NetValue ?? '0'),
+        incomeTax: parseFloat(ci.IncomeTax ?? '0'),
+        isLiquidity: true,           // liquidez diária → classifica como Caixa
+        benchMark: 'CDI',
+        indexRate: ci.Name?.Indexador ?? null,
+        extra: {
+          subTipo: 'CAIXA',
+          issueDate: ci.IssueDate ?? null,
+          maturityDate: ci.MaturityDate ?? null,   // nominal (rolagem automática)
+        },
       });
     }
   }
