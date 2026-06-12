@@ -1,6 +1,6 @@
--- BACKFILL: liga clientes.consultor_id ao perfil do consultor já provisionado.
--- Re-rode quando criar/provisionar logins de consultores. Idempotente.
-UPDATE clientes c SET consultor_id = co.perfil_id
+-- BACKFILL v2: liga clientes.consultor_id ao CADASTRO do consultor (consultores.id).
+-- Nao depende de login provisionado (o RLS resolve o login via join). Idempotente.
+UPDATE clientes c SET consultor_id = co.id
 FROM (VALUES
   ('230001', 1004),
   ('230002', 1004),
@@ -330,4 +330,4 @@ FROM (VALUES
   ('230353', 1016)
 ) AS m(codigo_avere, codigo_interno)
 JOIN consultores co ON co.codigo_interno = m.codigo_interno
-WHERE c.codigo_avere = m.codigo_avere AND co.perfil_id IS NOT NULL;
+WHERE c.codigo_avere = m.codigo_avere;

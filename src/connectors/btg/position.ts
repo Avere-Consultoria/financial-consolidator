@@ -126,20 +126,53 @@ function mapBtgPosition(raw: any, accountNumber: string): UnifiedPosition {
   }
 
   // ── Fundos de Investimento ──────────────────────────────────────────────────
+  // A posição do fundo é a SOMA de todos os aportes (Acquisition[]) — pegar só
+  // o primeiro subestimava o patrimônio de quem aportou mais de uma vez.
+  // ShareValue é o valor da COTA (preço unitário), não a quantidade.
   for (const item of raw.InvestmentFund ?? []) {
+    const aportes: any[] = item.Acquisition ?? [];
+    const soma = (campo: string) =>
+      aportes.reduce((acc, a) => acc + parseFloat(a?.[campo] ?? '0'), 0);
+    const primeiraData = aportes
+      .map((a) => a?.AcquisitionDate)
+      .filter(Boolean)
+      .sort()[0];
+
     assets.push({
       assetClass: 'INVESTMENT_FUND',
       name: item.Fund?.FundName ?? 'Fundo',
       securityCode: item.Fund?.SecurityCode,
-      quantity: parseFloat(item.ShareValue ?? '0'),
-      grossValue: parseFloat(item.Acquisition?.[0]?.GrossAssetValue ?? '0'),
-      netValue: parseFloat(item.Acquisition?.[0]?.NetAssetValue ?? '0'),
-      acquisitionDate: item.Acquisition?.[0]?.AcquisitionDate,
+      quantity: soma('NumberOfShares'),
+      marketPrice: parseFloat(item.ShareValue ?? '0'),
+      grossValue: soma('GrossAssetValue'),
+      netValue: soma('NetAssetValue'),
+      incomeTax: soma('IncomeTax'),
+      acquisitionDate: primeiraData,
       benchMark: item.Fund?.BenchMark,
       extra: {
         manager: item.Fund?.ManagerName,
         fundLiquidity: item.Fund?.FundLiquidity,
         cnpj: item.Fund?.FundCNPJCode,
+        costValue: soma('CostValue'),
+        // Lotes individuais — mesma forma da renda fixa; a edge function já
+        // grava extra.acquisitions em posicao_btg_aquisicoes.
+        acquisitions: aportes.map((acq: any) => ({
+          acquisitionDate: acq.AcquisitionDate ?? null,
+          quantity: acq.NumberOfShares != null ? parseFloat(acq.NumberOfShares) : null,
+          costPrice: acq.CostPrice != null ? parseFloat(acq.CostPrice) : null,
+          initialInvestmentValue: acq.CostValue != null ? parseFloat(acq.CostValue) : null,
+          initialInvestmentQuantity: acq.NumberOfShares != null ? parseFloat(acq.NumberOfShares) : null,
+          grossValue: acq.GrossAssetValue != null ? parseFloat(acq.GrossAssetValue) : null,
+          netValue: acq.NetAssetValue != null ? parseFloat(acq.NetAssetValue) : null,
+          incomeTax: acq.IncomeTax != null ? parseFloat(acq.IncomeTax) : null,
+          iofTax: acq.VirtualIOF != null ? parseFloat(acq.VirtualIOF) : null,
+          yieldToMaturity: null,
+          indexYieldRate: null,
+          ftsId: null,
+          transferId: null,
+          interfaceDate: null,
+          isVirtual: false,
+        })),
       },
     });
   }

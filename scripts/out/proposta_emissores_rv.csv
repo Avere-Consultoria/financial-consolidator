@@ -1,0 +1,145 @@
+﻿ticker;tipo;aplicar;empresa;setor;confianca;nome_sistema;ativo_canonico_id
+ALOS3;ACAO;SIM;Allos;Imobiliário;alta;ALLOS       ON      NM;10e8772c-0c0a-4762-bf57-6c10f3759bd1
+BBSE3;ACAO;SIM;BB Seguridade;Financeiro;alta;BBSEGURIDADEON      NM;cfdd4995-73b8-447b-a662-777302ecf70e
+BPAC11;ACAO;SIM;BTG Pactual;Financeiro;alta;BTGP BANCO  UNT     N2;35224e6a-e471-4668-bf35-f3a68a5fc3a9
+INBR32;ACAO;SIM;Banco Inter;Financeiro;alta;INTER CO    DR2;abf51e72-ccd4-4472-b645-de86278e951b
+BBAS3;ACAO;SIM;Banco do Brasil;Financeiro;alta;BRASIL      ON  EJ  NM;8963d87a-1bb1-4c3e-9a7e-bcec1f06459a
+BBDC4;ACAO;SIM;Bradesco;Financeiro;alta;BRADESCO    PN  EJ  N1;a13b6cb8-cb7b-40ec-89ff-9a8784f38a99
+CPFE3;ACAO;SIM;CPFL Energia;Energia Elétrica;alta;CPFL ENERGIAON      NM;30f6ea82-288c-43c1-88f2-45c04cd0aa28
+CMIN3;ACAO;SIM;CSN Mineração;Indústria;alta;CSNMINERACAOON      N2;0eaa4b66-70be-4638-87be-e81c1e1c1f70
+CSUD3;ACAO;SIM;CSU Digital;Tecnologia;alta;CSU DIGITAL ON      NM;d2b0d052-9ba4-43ce-9a92-7fb9d6d454c2
+CXSE3;ACAO;SIM;Caixa Seguridade;Financeiro;alta;CAIXA SEGURION      NM;2e8eb337-323b-43e7-9c7b-63625bec8dad
+BHIA3;ACAO;SIM;Casas Bahia;Varejo & Consumo;alta;CASAS BAHIA ON  ATZ NM;07892e1d-19f5-4c0b-b358-18cbc780d7f7
+CSAN3;ACAO;NAO - master revisa;Cosan;Petróleo & Gás;media;COSAN       ON      NM;11960c46-8117-41ad-a5a1-6e682dc97122
+CYRE4;ACAO;SIM;Cyrela;Imobiliário;alta;CYRELA REALTPN      NM;58ec22a3-07ae-450f-a4b1-f91b5db3e527
+EMBJ3;ACAO;SIM;Embraer;Indústria;alta;EMBRAER     ON      NM;92e2389a-667a-4385-b7be-9f5a2061006e
+ENGI11;ACAO;SIM;Energisa;Energia Elétrica;alta;ENERGISA    UNT     N2;41aee919-65ed-42b6-ad4a-66f16c2816dc
+EGIE3;ACAO;SIM;Engie Brasil;Energia Elétrica;alta;ENGIE BRASILON      NM;2e121270-c533-4d3a-9c72-ac5267101418
+FLRY3;ACAO;SIM;Fleury;Saúde;alta;FLEURY      ON      NM;281e4f03-8cae-4a21-a2aa-6b46213c5fd5
+ITUB4;ACAO;SIM;Itaú Unibanco;Financeiro;alta;ITAUUNIBANCOPN  EJ  N1;d0741c04-b3b3-4dc0-89a9-750ecbcb19c8
+ITSA3;ACAO;SIM;Itaúsa;Financeiro;alta;ITAUSA      ON  EJ  N1;a58d86b0-aff3-40dd-a449-1160871cef87
+ITSA4;ACAO;SIM;Itaúsa;Financeiro;alta;ITAUSA      PN  EJ  N1;cdf3df7b-c09a-47ee-a29f-100c10114fd1
+LAVV3;ACAO;SIM;Lavvi;Imobiliário;alta;LAVVI       ON      NM;1827e994-09b0-4163-828e-067323c85f69
+LOGG3;ACAO;SIM;Log Commercial Properties;Imobiliário;alta;LOG COM PROPON      NM;a39117ba-e1ad-4ba8-9df1-d98518b51829
+LREN3;ACAO;SIM;Lojas Renner;Varejo & Consumo;alta;LOJAS RENNERON      NM;8b487e7c-c024-45e6-8059-236d0f94da10
+MRVE3;ACAO;SIM;MRV;Imobiliário;alta;MRV         ON      NM;2cb464bd-d6b0-4b71-a05f-cbd54f60b116
+MILS3;ACAO;NAO - master revisa;Mills;Indústria;media;MILLS       ON      NM;47ad908c-e3cf-4c90-8bb1-beb15809a740
+MOTV3;ACAO;SIM;Motiva;Infraestrutura & Transporte;alta;MOTIVA SA   ON      NM;d8a91cd4-1127-4ca8-bd1a-04b16e535545
+PETR3;ACAO;SIM;Petrobras;Petróleo & Gás;alta;PETROBRAS   ON  EJ  N2;b265924e-ba95-47e9-8cb6-f0e8aa2630d4
+PETR4;ACAO;SIM;Petrobras;Petróleo & Gás;alta;PETROBRAS   PN  EJ  N2;bb431608-011d-47c4-9000-1d6f04207b20
+PRIO3;ACAO;SIM;Prio;Petróleo & Gás;alta;PRIO        ON      NM;387a412c-ffeb-4a27-a47e-d09de80681fa
+RADL3;ACAO;NAO - master revisa;RaiaDrogasil;Varejo & Consumo;media;RAIADROGASILON      NM;579c06f8-61b0-4cf2-bc20-837116cff2a8
+RAIZ4;ACAO;NAO - master revisa;Raizen;Agronegócio;media;RAIZEN      PN      N2;0002f2c4-0033-4154-8808-baa830871711
+SAPR11;ACAO;SIM;Sanepar;Saneamento;alta;SANEPAR     UNT     N2;ba7f4303-ae43-4cc5-a36c-f404fe45cdd7
+SANB11;ACAO;SIM;Santander Brasil;Financeiro;alta;SANTANDER BRUNT;c0d50016-c6e7-48e9-996c-3a9193a4c93d
+SANB3;ACAO;SIM;Santander Brasil;Financeiro;alta;SANTANDER BRON;34047c71-6e59-4be2-8fa4-6c99fd818d09
+SHUL4;ACAO;SIM;Schulz;Indústria;alta;SCHULZ      PN;263e4ec9-9411-4adc-a4ee-952381a4cc2f
+SMFT3;ACAO;NAO - master revisa;Smart Fit;Saúde;media;SMART FIT   ON  EJ  NM;71f508ab-49aa-4cb2-99fe-c03a2251d18e
+SUZB3;ACAO;SIM;Suzano;Papel & Celulose;alta;SUZANO S.A. ON      NM;48672058-e540-406d-bd68-11f863ef2b56
+TAEE11;ACAO;SIM;Taesa;Energia Elétrica;alta;TAESA       UNT     N2;e9c63fd3-688f-40ec-bade-092b243aed79
+TOTS3;ACAO;SIM;Totvs;Tecnologia;alta;TOTVS       ON      NM;67154c9c-9c1c-4c14-9193-6163bc85f1ea
+VALE3;ACAO;SIM;Vale;Indústria;alta;VALE        ON      NM;88539c8e-4b4b-4eda-b2b8-a461830b6907
+VLID3;ACAO;NAO - master revisa;Valid;Tecnologia;media;VALID       ON      NM;ef50fbca-e00d-4780-aa17-5d10bf382e78
+VIVA3;ACAO;SIM;Vivara;Varejo & Consumo;alta;VIVARA S.A. ON      NM;bdd55cde-eb36-47e5-a3f1-477d5ca10529
+WEGE3;ACAO;SIM;WEG;Indústria;alta;WEG         ON      NM;523d54c8-b175-48e4-b5d6-ff8530c4518b
+ALUG11;ETF;NAO - ETF sem emissor;;;;INVESTO ALUGCI;c9fca178-04c6-45b0-82ac-e5e6f48f0fcd
+ARGE11;ETF;NAO - ETF sem emissor;;;;INVESTOARGE CI;89db707d-f0e7-465b-babb-31ceb8723c1d
+AURO11;ETF;NAO - ETF sem emissor;;;;ETF BV AURO CI;7299c16e-8bcf-4ce6-bc42-329c1c7d5503
+B5P211;ETF;NAO - ETF sem emissor;;;;IT NOW B5P2 F11;11d8768d-f287-4b2c-bc39-414f0758a7d1
+BDRI39;ETF;NAO - ETF sem emissor;;;;GX AEVEHICLEDRE;940fc042-54af-4d5d-8b03-2bf561b0d776
+BEST11;ETF;NAO - ETF sem emissor;;;;INVESTOBEST CI  ER;227bf4e8-e8d7-4d9c-93ea-8218982ce2d0
+BGNO39;ETF;NAO - ETF sem emissor;;;;GX GENOMBIOTDRE;73250786-06e4-4998-999e-a85e94c1341d
+BGOV39;ETF;NAO - ETF sem emissor;;;;BKR US TREASDRE ED;2fefa400-4bdc-47cf-a548-bc5b084edc70
+BIXC39;ETF;NAO - ETF sem emissor;;;;BKR GLB ENERDRE;5271d9d0-ec9e-4747-a683-076de46c4305
+BIZD11;ETF;NAO - ETF sem emissor;;;;INVESTO BIZDCI;52ff666e-99dd-4980-a06c-f3cca84c1519
+BNDX11;ETF;NAO - ETF sem emissor;;;;INVESTO BNDXCI;effb5387-9d45-44a1-bb6f-ef608b4c7249
+BODB11;ETF;NAO - ETF sem emissor;;;;FIC FI BCNA CI  ER;1fb67002-fc18-4cbc-a8c7-105d6dc783e4
+BODI11;ETF;NAO - ETF sem emissor;;;;FIC FI BODI CI  ER;360eccea-7091-41c7-a564-37b3d96e74de
+BOVA11;ETF;NAO - ETF sem emissor;;;;ISHARES BOVACI;610d5aab-afd3-453d-86af-b1754ca91350
+BURA39;ETF;NAO - ETF sem emissor;;;;GX URANIUM  DRE;39b335be-3f4b-44ce-a0b9-9d8e330a5b64
+CDII11;ETF;NAO - ETF sem emissor;;;;SPARTA CDII CI  ER;0b641db1-8d6f-4f18-addb-3e5c83653774
+CHIP11;ETF;NAO - ETF sem emissor;;;;INVESTO CHIPCI;63403f7f-6196-4879-9f75-f02f16a6fae4
+DIVD11;ETF;NAO - ETF sem emissor;;;;IT NOW DIVD CI;adda3653-f12f-4304-b632-0e83eaa156cb
+DOLA11;ETF;NAO - ETF sem emissor;;;;BB ETF DOLARCI;60e0a1da-c3be-41d1-93aa-1b4030d78d96
+FIND11;ETF;NAO - ETF sem emissor;;;;IT NOW IFNC CI;bdaeef5c-49b2-4bb6-89d7-4dbb9f8b72a4
+GOLD11;ETF;NAO - ETF sem emissor;;;;TREND OURO  CI;d76a733a-665f-47a3-bee8-1731a9555695
+HASH11;ETF;NAO - ETF sem emissor;;;;HASHDEX NCI CI;d327f012-c7de-4296-b47e-ef97eb32e535
+HODL11;ETF;NAO - ETF sem emissor;;;;INVESTO HODLCI;0a02c2ac-4860-4ba8-8bdb-75b7985e2b46
+HYBR11;ETF;NAO - ETF sem emissor;;;;NUIBOXXBRLHYF11;f6dfaab7-7390-4820-9a3e-f6de2934446f
+IDKA11;ETF;NAO - ETF sem emissor;;;;IT NOW PRE 3F11;54c3283b-78fc-41f8-854b-8aae94e07d97
+IMAB11;ETF;NAO - ETF sem emissor;;;;IT NOW IMA-BF11;6d284cd8-4c66-4549-bfba-6576d8522c8a
+IRFM11;ETF;NAO - ETF sem emissor;;;;IT NOW IRF-MF11;18918bc3-c71d-47f6-8344-5e971af9bc48
+IVVB11;ETF;NAO - ETF sem emissor;;;;ISHARE SP500CI;b7809dbe-b5cd-4d5c-8ad2-ab7c6f28acd8
+IWMI11;ETF;NAO - ETF sem emissor;;;;ETF BV IWMI CI;36ba7d64-7ce3-41f8-9dfb-074a04cce0c5
+JOGO11;ETF;NAO - ETF sem emissor;;;;INVESTO JOGOCI;04b0a019-1870-4d05-adfd-62bc40c475e1
+JURO11;ETF;NAO - ETF sem emissor;;;;SPARTA INFRACI  ER;f46a143c-2192-48bb-911e-67159e9b12d2
+LFTB11;ETF;NAO - ETF sem emissor;;;;INVESTO LFTBF11;41fade26-6eca-44ad-a5ee-9420da6aeb93
+LFTS11;ETF;NAO - ETF sem emissor;;;;INVESTO LFTSF11;332448ee-e926-497b-a455-216fe68ca885
+QQQI11;ETF;NAO - ETF sem emissor;;;;ETF BV QQQI CI;8e748019-7e24-4b0e-a4eb-e64ed287af71
+SMAC11;ETF;NAO - ETF sem emissor;;;;IT NOW SMALLCI;76d9a306-ed7f-41a0-a3b4-56d2223033cd
+SMAL11;ETF;NAO - ETF sem emissor;;;;ISHARES SMALCI;b910bf5b-7bf1-4f79-ab74-358524ace58b
+SPXI11;ETF;NAO - ETF sem emissor;;;;IT NOW SPXI CI;8736208a-c1ee-4400-9521-dd07834dbecf
+USDB11;ETF;NAO - ETF sem emissor;;;;INVESTO USDBCI;25fcba8e-1eee-4b88-9ba4-5e3202dc7dd0
+WEB311;ETF;NAO - ETF sem emissor;;;;SMART HASH  CI;f473e3f7-ae58-43fd-a243-7cc6ab05e699
+WRLD11;ETF;NAO - ETF sem emissor;;;;INVESTO WRLDCI;dfb9c91e-e42b-47dd-a19b-fd2d05f508cc
+AZIN11;FII;NAO - master revisa;AZ Quest;Infraestrutura & Transporte;media;AZQ INFRA IICI;2656f6ec-72d8-4d99-a8c6-e2a583a4dcc9
+ALZR11;FII;NAO - master revisa;Alianza Gestão;Imobiliário;media;FII ALIANZA CI;0c27830c-7cbd-4f49-8607-3110c5202bf8
+BPML11;FII;SIM;BTG Pactual;Imobiliário;alta;FII BTG SHOPCI;3ff3d487-2313-4a1d-b018-248102f37aab
+BRCR11;FII;NAO - master revisa;BTG Pactual;Imobiliário;media;FII BC FUND CI  ER;914178ab-2cd6-4d64-8346-d9391985efb5
+BTAG11;FII;SIM;BTG Pactual;Agronegócio;alta;FIAGRO BTAG CI  ER;03907639-af47-4afd-a86e-8e331c3fe175
+BTCI11;FII;SIM;BTG Pactual;Imobiliário;alta;FII BTG CRI CI  ER;a334191b-689d-4647-bb94-e064b30d1c58
+BTHF11;FII;SIM;BTG Pactual;Imobiliário;alta;FII BTHF    CI  ER;c197d403-6539-430c-b1b6-b23084078c22
+BTLG11;FII;SIM;BTG Pactual;Imobiliário;alta;FII BTLG    CI;59a6022b-1dbf-47fd-9396-9dd1eba55063
+BTLG15;FII;SIM;BTG Pactual;Imobiliário;alta;FII BTLG    REC;b0e36dbb-fc0f-4b06-ab51-18e6346763ba
+BRCO11;FII;NAO - master revisa;Bresco;Imobiliário;media;FII BRESCO  CI  ER;f434e468-c9ca-41ce-83a8-676e43a3b98d
+CPTI11;FII;NAO - master revisa;Capitânia;Infraestrutura & Transporte;media;FIC IE CAP  CI  ER;740408a7-ad59-4903-abd6-8e53cbc8f3f2
+CPTS11;FII;NAO - master revisa;Capitânia;Imobiliário;media;FII CAPI SECCI;e6e92ad7-efd5-48a2-840e-e42cee597e95
+DEVA11;FII;NAO - master revisa;Devant;Imobiliário;media;FII DEVANT  CI  ER;d8cd49ef-c145-4446-ac4c-f99de00102d3
+EXES11;FII;NAO - master revisa;Exes;Imobiliário;media;FII EXES    CI;180eb806-834d-4d2a-9913-1c8186c5f98e
+FGAA11;FII;NAO - master revisa;FG/A;Agronegócio;media;FIAGRO FGA  CI  ER;ba888ed7-d03a-439c-9241-4163827908dd
+CPLG11;FII;NAO - master revisa;FII CPLG;Imobiliário;media;FII CPLG    CI  ER;fdb54c78-81d5-4cfe-8c1b-846760a320b9
+CNES11;FII;NAO - master revisa;FII Cenesp;Imobiliário;media;FII CENESP  CI;3a36fedf-7f49-4ac9-98ec-631020116401
+PLAG11;FII;NAO - master revisa;FII PLAG;Imobiliário;media;FII PLAG    CI  ER;cfc9496c-583a-400e-9d41-d5fd427f2da9
+GGRC11;FII;NAO - master revisa;GGR;Imobiliário;media;FII GGR ZAG CI  ER;90197027-3df6-4c73-b796-99762180abbd
+GZIT11;FII;NAO - master revisa;Gazit;Imobiliário;media;FII GAZIT   CI;0a48f4ff-a636-4a4b-936c-021541e736ee
+GTWR11;FII;NAO - master revisa;Green Towers;Imobiliário;media;FII G TOWERSCI  ER;1136be1d-e6ea-4347-b82b-a09f822ebf4e
+GARE11;FII;NAO - master revisa;Guardian;Imobiliário;media;FII GUARDIANCI  ER;42b37aed-79cf-4c7f-86ca-6ab4f46c88a7
+HSML11;FII;NAO - master revisa;HSI;Imobiliário;media;FII HSI MALLCI  ER;4780474d-b5d2-4e5a-a909-b3633047e3fa
+HFOF11;FII;NAO - master revisa;Hedge Investments;Imobiliário;media;FII HTOPFOF3CI  ER;be518ad2-2412-41c8-805b-599a4fdf4ad1
+HGBS11;FII;NAO - master revisa;Hedge Investments;Imobiliário;media;FII HEDGEBS CI  ER;a524f8d4-4c20-476a-8e03-639e8587c821
+JSAF11;FII;NAO - master revisa;J Safra;Imobiliário;media;FII JS A FINCI  ER;273e4903-e793-4cc4-84ae-100587a68748
+KFOF11;FII;SIM;Kinea;Imobiliário;alta;FII KINEAFOFCI  ER;8c84f4c2-c75e-429d-90f3-705facc2f333
+KNCR11;FII;SIM;Kinea;Imobiliário;alta;FII KINEA RICI  ER;60148e48-fd81-4b9a-b4f0-0ff2fc3ca858
+KNHY11;FII;SIM;Kinea;Imobiliário;alta;FII KINEA HYCI  ER;aa21b9db-f333-4672-b6e5-559fafa095fd
+KNIP11;FII;SIM;Kinea;Imobiliário;alta;FII KINEA IPCI  ER;d27c0c02-4985-4551-8cb4-e0ed3740a26d
+KNUQ11;FII;SIM;Kinea;Imobiliário;alta;FII KINEA UNCI  ER;e5f380d5-8758-4944-9bf0-20b2ca808d07
+MCCI11;FII;NAO - master revisa;Mauá Capital;Imobiliário;media;FII MAUA    CI;20a5ffb3-2d40-4a86-9b3a-ba0131539202
+MCRE11;FII;NAO - master revisa;Mauá Capital;Imobiliário;media;FII MAUA RE CI;518e062b-891c-4791-bc5e-e5d883b38904
+HGLG11;FII;NAO - master revisa;Pátria;Imobiliário;media;FII HGLG PAXCI  ER;b888cc94-dc06-492f-81c2-774e61a08274
+HGRU11;FII;NAO - master revisa;Pátria;Imobiliário;media;FII HGRU PAXCI  ERS;6ab0ba9a-2cba-4d37-b940-830dd7e3b2e4
+HGRU12;FII;NAO - master revisa;Pátria;Imobiliário;media;FII HGRU PAXDM  128,87;d6501e56-123c-4782-8bec-fef0f475d7b7
+PCIP11;FII;NAO - master revisa;Pátria;Imobiliário;media;FII PCIP PAXCI;5184d1f4-2502-4783-ac5d-fac917f76dfa
+PMLL11;FII;NAO - master revisa;Pátria;Imobiliário;media;FII PMLL PAXCI  ER;e3d8b869-343d-498e-964d-79f6d335322a
+RBRL11;FII;NAO - master revisa;RBR Asset;Imobiliário;media;FII RBRL PAXCI  ER;b2c08c1d-4031-482d-a3e7-adc3e1cae756
+RBRR11;FII;NAO - master revisa;RBR Asset;Imobiliário;media;FII RBRR PAXCI;358aa7bf-b74a-489b-823e-421ffeb160d3
+RBRX11;FII;NAO - master revisa;RBR Asset;Imobiliário;media;FII RBRX PAXCI;433aafd0-cc18-4f1c-88ec-d509bfccd011
+RBRY11;FII;NAO - master revisa;RBR Asset;Imobiliário;media;FII RBRY PAXCI;e6c14133-c276-4c46-858a-bb2e98bb912d
+RECR11;FII;NAO - master revisa;REC Gestão;Imobiliário;media;FII REC RECECI  ER;8450862d-5320-444e-9d53-3ea92060a9cc
+RECR12;FII;NAO - master revisa;REC Gestão;Imobiliário;media;FII REC RECEDM   89,00;93c5ddcd-f0c5-4d49-91b0-47871e9dea0a
+RBVA11;FII;NAO - master revisa;Rio Bravo;Imobiliário;media;FII RIOB VA CI  ER;acfcf35f-f011-43bf-a287-5b07ee227b34
+RZAK11;FII;NAO - master revisa;Riza;Imobiliário;media;FII RIZA AKNCI;3260edd3-7232-48ed-ad13-eaef20f58ea6
+RZAT11;FII;NAO - master revisa;Riza;Imobiliário;media;FII ARCTIUM CI;dfbf98bc-823b-4300-ac27-a80fa2e57ea8
+RZTR11;FII;NAO - master revisa;Riza;Imobiliário;media;FII RIZA TX CI  ER;d1e6abd3-d5a4-4d17-a158-cdc4a2593614
+SNAG11;FII;NAO - master revisa;Suno;Agronegócio;media;FIAGRO SUNO CI;2b77ee9d-7e5f-4611-b334-6ff8c52e27ca
+SNCI11;FII;NAO - master revisa;Suno;Imobiliário;media;FII SUNO CRICI;6fac0732-e456-4da5-a676-69e24708f013
+TGAR11;FII;NAO - master revisa;TG Core;Imobiliário;media;FII TG ATIVOCI  ER;59ecaab2-9e72-4722-b0fa-8d670195a801
+TRXF11;FII;NAO - master revisa;TRX;Imobiliário;media;FII TRX REALCI  ER;28448dd5-ad46-43a3-a071-1ebe49d3702e
+TEPP11;FII;NAO - master revisa;Tellus;Imobiliário;media;FII TEL PROPCI  ER;68f36b66-3892-452f-a6d3-bd14165323c9
+TEPP12;FII;NAO - master revisa;Tellus;Imobiliário;media;FII TEL PROPDM    9,71;8b59f2c9-1042-4904-882d-125de368d752
+PATL11;FII;NAO - master revisa;VBI;Imobiliário;media;FII PATL VBICI;3044d6b8-68e8-4bdc-bb2c-1cbd874b2663
+PVBI11;FII;NAO - master revisa;VBI;Imobiliário;media;FII PVBI VBICI  ER;f2cb429e-972c-461c-a168-fe37c24c173a
+VGHF11;FII;NAO - master revisa;Valora;Imobiliário;media;FII VALOR HECI  ER;0a21674d-7a38-4c8b-bdd2-c3414c3ca188
+VILG11;FII;NAO - master revisa;Vinci Partners;Imobiliário;media;FII VINCI LGCI  ER;025db07d-9745-4379-9e5c-41491d2d6b90
+VISC11;FII;NAO - master revisa;Vinci Partners;Imobiliário;media;FII VINCI SCCI  ER;b4f69fc9-8d1d-4672-ae71-04658ba37e0a
+MXRF11;FII;NAO - master revisa;XP Asset;Imobiliário;media;FII MAXI RENCI  ER;bcbb4d10-a431-4eed-b0ec-0e9866173cef
+XPML11;FII;NAO - master revisa;XP Asset;Imobiliário;media;FII XP MALLSCI;57fafd63-2243-419b-8481-10f839db80ff

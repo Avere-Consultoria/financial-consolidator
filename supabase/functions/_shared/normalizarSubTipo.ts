@@ -65,6 +65,15 @@ const MAPA: Record<string, string> = {
 
   'TESOURO IPCA':                             'NTNB',
   'TESOURO IPCA+':                            'NTNB',
+
+  // ── Variações com qualificador embutido ───────────────────────────────────
+  'CRA PREFIXADO':                            'CRA',
+  'CRA POS-FIXADO':                           'CRA',
+  'CRA PÓS-FIXADO':                           'CRA',
+  'CRI PREFIXADO':                            'CRI',
+  'OPERACAO COMPROMISSADA':                   'COMPROMISSADA',
+  'OPERAÇÃO COMPROMISSADA':                   'COMPROMISSADA',
+  'COMPROMISSADA':                            'COMPROMISSADA',
 }
 
 /**
@@ -75,5 +84,8 @@ export function normalizarSubTipo(raw: string | null | undefined): string | null
   if (!raw) return null
   const key = raw.trim().toUpperCase()
   if (!key) return null
+  // Compromissadas vêm com o lastro embutido no código (ex.: "Comp*CRI-12F0036335")
+  // — o que importa como família é ser compromissada, não o lastro.
+  if (key.startsWith('COMP*')) return 'COMPROMISSADA'
   return MAPA[key] ?? raw.trim()
 }

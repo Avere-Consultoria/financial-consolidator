@@ -28,6 +28,12 @@ Deno.serve(async (req: Request) => {
     if (String(senha).length < 8) {
       return errorResponse('A senha temporária deve ter ao menos 8 caracteres', 400)
     }
+    // Domínio de roles (mesmo do check constraint perfis_role_check) — valida
+    // aqui pra falhar com mensagem clara em vez de erro de constraint.
+    const ROLES_VALIDOS = new Set(['MASTER', 'CONSULTOR_INTERNO', 'CONSULTOR_EXTERNO', 'CLIENTE'])
+    if (role && !ROLES_VALIDOS.has(role)) {
+      return errorResponse(`role inválido: "${role}". Válidos: ${[...ROLES_VALIDOS].join(', ')}`, 400)
+    }
 
     const admin = createServiceClient()
 
@@ -56,7 +62,7 @@ Deno.serve(async (req: Request) => {
 
     // 2. Perfil (id = uid). upsert para robustez caso exista trigger de signup.
     const { error: errPerfil } = await admin.from('perfis').upsert(
-      { id: uid, email, nome: nome ?? null, role: role ?? 'CONSULTOR' },
+      { id: uid, email, nome: nome ?? null, role: role ?? 'CONSULTOR_INTERNO' },
       { onConflict: 'id' },
     )
     if (errPerfil) {

@@ -1,0 +1,896 @@
+[
+ {
+  "id": "b9adb3b0-8a55-4456-845a-3de5d0841ac4",
+  "nome": "A1 High Grade Pós Fixado Feeder 2 FIF RF",
+  "cnpj": "57832914000136",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "e9573e23-8a98-4a4f-9c72-f79db4424cb6",
+  "nome": "Absolute Hidra CDI Plus P Infra RF RL",
+  "cnpj": "57027655000170",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "c5d28345-bb8b-47ef-a820-e801c3e4e74c",
+  "nome": "ADAM MACRO II FICFIM",
+  "cnpj": "24029438000160",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "86ee9549-0952-48fe-9178-54695993cc47",
+  "nome": "ARTESANAL BTG CDI FIC DE FIDC RL",
+  "cnpj": "59116601000107",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "769575a0-7b57-4cd9-8f80-226a3b2b47ae",
+  "nome": "ARTESANAL CDI FIC FIDC II RL",
+  "cnpj": "57812456000173",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "315ec188-8f72-45c4-8db1-438cc5240aae",
+  "nome": "Artesanal Credito Privado 30 FIDC RL",
+  "cnpj": "45830738000114",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "2b2d467b-2eda-4a73-a18a-ef187b33ace4",
+  "nome": "Artesanal Credito Privado FICFIM",
+  "cnpj": "20441301000168",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "a1819d9e-5388-45a2-a9bb-86f68ac9d3e1",
+  "nome": "Artesanal Multimercado FICFIM",
+  "cnpj": "09625909000100",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "89c4f182-4486-415e-87c1-b4f02ee521a6",
+  "nome": "Artesanal Renda Fixa FIRF",
+  "cnpj": "24773832000109",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "929d6f45-9951-40bb-a675-6c5b3363b2b4",
+  "nome": "ARX CHILLON REC FII",
+  "cnpj": "54869435000104",
+  "classe_atual": "FII-FIAgro"
+ },
+ {
+  "id": "e38b8c40-0c64-47b9-9140-ad9325919680",
+  "nome": "ARX FUJI FUNDO DE INVESTIMENTO EM COTAS DE FUNDOS DE INVESTIMENTO RENDA FIXA CRÉDITO PRIVADO",
+  "cnpj": "52286231000107",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "37470255-747a-46a1-be49-80d6978ce554",
+  "nome": "AZ QUEST - PRE - INFRA-YIELD IX FIP INFR",
+  "cnpj": "62362591000102",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "99965205-853d-437a-a7ee-d9a85a9ebcfa",
+  "nome": "AZ QUEST INFRA-YIELD VII FIP INFRA",
+  "cnpj": "59939757000198",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "56a3aac9-2a1e-4f30-a7af-f38bab1d11a8",
+  "nome": "BNP Paribas Match DI FIRF CrPr",
+  "cnpj": "09636393000107",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "9627f620-8435-4828-8c6d-499839c31ad7",
+  "nome": "Bradesco Athos FIDC RL",
+  "cnpj": "60759253000175",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "051907cc-b3f4-490a-9939-a500b4cda63a",
+  "nome": "BRADESCO DEBÊNTURES INCENTIVADAS CDI II CLASSE DE COTAS DE INVESTIMENTO EM COTAS DE INVESTIMENTO RENDA FIXA INCENTIVADO EM INFRAESTRUTURA LONGO PRAZO",
+  "cnpj": "54829603000120",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "2d25e3f8-37b0-4611-8e79-17e66fd33abb",
+  "nome": "Bradesco Maple Valor FIC FIA",
+  "cnpj": "54402012000171",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "dd43465f-2ecc-40a2-8f3a-39d1c463395d",
+  "nome": "BRADESCO OURO FICFIM",
+  "cnpj": "37235773000167",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "9548f5a0-d065-4ad9-81cd-4e33afdb3fee",
+  "nome": "Bradesco SKY DI",
+  "cnpj": "04831907000153",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "04cdd77d-eef8-425f-bfb1-6d80b0bb0fac",
+  "nome": "Bradesco Zupo CP",
+  "cnpj": "34109809000178",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "814c4bcb-8fb6-4247-9ad7-b0d4a107e466",
+  "nome": "BRASIL ENERGIA FII RESP LIMITADA",
+  "cnpj": "61250889000150",
+  "classe_atual": "FII-FIAgro"
+ },
+ {
+  "id": "b84c88e2-ec29-403e-9ba1-60209805eea5",
+  "nome": "BRZ HIGH GRADE FIRF CrPr",
+  "cnpj": "33342285000106",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "a6e201bb-5294-4014-8829-513a6dd1a71c",
+  "nome": "BTG Apolo II FICFIDC RL",
+  "cnpj": "60571986000181",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "6b566bb9-f149-4aa7-955d-f61f43b95c4b",
+  "nome": "BTG Black Tesouro Selic Simples FIRF RL",
+  "cnpj": "54996629000162",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "d233cf37-4897-425e-899a-1ed9c7695e24",
+  "nome": "BTG CDB Plus FIRF CrPr",
+  "cnpj": "27717359000130",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "b33a0f78-ce4c-48bc-bdf9-cf9525774b70",
+  "nome": "BTG CRED CORP DINAMICO FICFIRF CrPr",
+  "cnpj": "50877951000111",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "aa9f435d-da2f-4ca5-a542-2c37504ece4f",
+  "nome": "BTG CRED CORP INCENTIVADO FICFIIIRF RL",
+  "cnpj": "30934757000113",
+  "classe_atual": "FII-FIAgro"
+ },
+ {
+  "id": "d550b5b3-731e-4d0a-99bf-65a8a5c44924",
+  "nome": "BTG CRED CORP PLUS FIM CrPr",
+  "cnpj": "33599991000120",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "22999329-6d58-496d-9efa-40710144ecfd",
+  "nome": "BTG Digital Tesouro Selic Simples FIRF",
+  "cnpj": "29562673000117",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "43115487-a9fc-4f59-8a4e-512fbbebeea4",
+  "nome": "BTG ECONOMIA REAL FEEDER I FIM",
+  "cnpj": "37927641000104",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "13305b7d-1ca7-4a78-be09-0990f7938b3e",
+  "nome": "BTG INCORPORACAO FII RESP LIMITADA",
+  "cnpj": "43008233000143",
+  "classe_atual": "FII-FIAgro"
+ },
+ {
+  "id": "71e3d362-4f85-494e-a31f-cd321ab4c6d8",
+  "nome": "BTG LOG AAA CAJAMAR FII RL SNR",
+  "cnpj": "59658166000142",
+  "classe_atual": "FII-FIAgro"
+ },
+ {
+  "id": "ade3a315-49df-43d5-abf0-fd6311853f1e",
+  "nome": "BTG PACTUAL DEBENTURES INC FICFIRF",
+  "cnpj": "34096235000140",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "470a8a96-ae0d-4ba2-a0b2-e5f89915bce7",
+  "nome": "BTG PACTUAL ENERGY DB FIP INFRAESTRUTURA",
+  "cnpj": "49343067000118",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "bd0f62fe-4a11-4f94-b288-d73f113cd441",
+  "nome": "BTG PACTUAL INFRA DEBT FIP",
+  "cnpj": "51248141000169",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "4806ccc3-0e58-438b-ab5f-c5b22d057dd7",
+  "nome": "BTG PACTUAL INV DE IMPACTO CL B FIP MULT",
+  "cnpj": "36642497000199",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "c59180b9-9642-423e-9db5-0966a9c70557",
+  "nome": "BTG PACTUAL LOGCP FII",
+  "cnpj": "50479122000180",
+  "classe_atual": "FII-FIAgro"
+ },
+ {
+  "id": "d357e043-e814-4c21-8d8f-a0e48596c3a7",
+  "nome": "BTG REF OURO FICFIM",
+  "cnpj": "36498594000150",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "4e4b212f-d3bb-4ad4-8f30-134469ae5746",
+  "nome": "BTG REF OURO USD FICFIM",
+  "cnpj": "36727910000118",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "e7f2a957-e246-4842-9eb3-b5a18a44083b",
+  "nome": "BTG SP 500 BRL FIM",
+  "cnpj": "36499594000174",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "435f7e2d-0994-45b4-aa90-a63c2b5a35ad",
+  "nome": "BTG Tesouro Selic FIRFRefDI",
+  "cnpj": "09215250000113",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "21ed9cfa-0e74-430b-9636-a69b376eb0f5",
+  "nome": "BTG Total Incentivado Infra FIRF",
+  "cnpj": "54517219000191",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "28ec9dc0-f9b5-4e4d-a7c7-aac2a86fc46e",
+  "nome": "BTG Yield DI FIRFRef CrPr",
+  "cnpj": "00840011000180",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "ffa6868f-14d8-4b4e-9c14-0ecedfdc7ac7",
+  "nome": "BTGP CRED AGRICOLA BTAG II PRE FIAGRO DC",
+  "cnpj": "58595391000114",
+  "classe_atual": "FII-FIAgro"
+ },
+ {
+  "id": "0c2f3769-8897-4972-a363-dc8162044846",
+  "nome": "BTGP CREDITO IMOBILIARIO CDI - FII RL",
+  "cnpj": "60027987000160",
+  "classe_atual": "FII-FIAgro"
+ },
+ {
+  "id": "626e7906-d6b7-4e59-b375-c2e2f63c7089",
+  "nome": "BTGP REF MODERADO FMP FGTS CARTE LIVRE",
+  "cnpj": "48329694000131",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "259ef5ca-586b-431d-b2b2-56ca70a6cdf3",
+  "nome": "BV BANKS FIRF CrPr",
+  "cnpj": "10347493000194",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "cd94d709-f17d-4c8b-a789-437d12a839b7",
+  "nome": "CANVAS VECTOR FICFIM",
+  "cnpj": "28866524000189",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "3564bdd8-825c-457b-9c5f-74f0fc0dd96b",
+  "nome": "Chamonix High Yield FIDC RL",
+  "cnpj": "56267236000143",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "9a8e73a3-359b-4228-b9f1-6f0c3c56848e",
+  "nome": "CHINA ADVANTAGE FIM CrPr IE ACCESS",
+  "cnpj": "38064885000165",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "192a1437-ee70-4395-ba84-14624fa88949",
+  "nome": "COMPASS CREDIT SELEC FICFIRF CrPr LP",
+  "cnpj": "35408329000170",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "c19c8bc0-62f7-445f-8182-cd7a805fd162",
+  "nome": "DAHLIA TOTAL RETURN FICFIM",
+  "cnpj": "30317454000151",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "a6035307-b8b1-42f3-baf6-e38d6eadf89f",
+  "nome": "DAYCOVAL SUBCLASSE TOP JUROS ATIVO FIF",
+  "cnpj": "59079948000127",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "a3c863a5-e6f7-4735-b480-56a676ad4aaf",
+  "nome": "EMPIRICA LOTUS FICFIM CrPr",
+  "cnpj": "17251743000137",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "52bbfbdc-ffb0-4255-b6a7-a58ab25c7206",
+  "nome": "EMPIRICA LOTUS IPCA FICFIM",
+  "cnpj": "22652091000182",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "1b875921-3fd4-45a7-b47a-3ad5266fb45f",
+  "nome": "ENERGIA REAL FII",
+  "cnpj": "63700460000142",
+  "classe_atual": "FII-FIAgro"
+ },
+ {
+  "id": "3161c358-36f0-4662-a303-6d7f5bd8aaba",
+  "nome": "Éxes D90 FIDC",
+  "cnpj": "38065069000176",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "b570ba80-ffbd-4653-8eba-5964a31510fb",
+  "nome": "FII LOTUS TOWER FII RESP LIMITADA",
+  "cnpj": "62173916000109",
+  "classe_atual": "FII-FIAgro"
+ },
+ {
+  "id": "fc05c097-576e-4e22-8bca-2dbb05884ac2",
+  "nome": "FII RIO BRAVO HEDGE FUND RESP LTDA",
+  "cnpj": "56053824000184",
+  "classe_atual": "FII-FIAgro"
+ },
+ {
+  "id": "2064f9e0-c9c6-4a90-b207-3a20aa37f466",
+  "nome": "HASHDEX 100 NASDAQ CRYPTO INDEX FIM",
+  "cnpj": "33736845000107",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "7d571122-b4cd-479a-9994-5b978db31201",
+  "nome": "HASHDEX 20 NASDAQ CRYPTO INDEX FICFIM",
+  "cnpj": "33736873000116",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "771b2f28-3a86-409f-8011-fdc880e534a6",
+  "nome": "HASHDEX 40 NASDAQ CRYPTO INDEX FICFIM",
+  "cnpj": "35088108000162",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "4d331a29-8951-4532-a864-0029535e19d7",
+  "nome": "HASHDEX BITCOIN FICFIM",
+  "cnpj": "36986672000165",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "4b18048b-d16c-4d1d-9d4b-39a1ab57a87d",
+  "nome": "HASHDEX CRYPTO DINÂMICO LB FICFIM",
+  "cnpj": "47612274000103",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "df8cd0fb-2f9e-42f2-b1a7-8c89fb09f92a",
+  "nome": "HASHDEX ETHEREUM FIM",
+  "cnpj": "44417431000123",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "6e8c56fb-0f85-4020-8bd7-ab0e057fc1dc",
+  "nome": "HECTARE REAL ESTATE FICFIM CrPr",
+  "cnpj": "29720571000182",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "30e0c80d-bde2-44aa-8a82-fa4e8cac1bfa",
+  "nome": "Hidra CDI FICFIInfraRF",
+  "cnpj": "47612737000129",
+  "classe_atual": "FII-FIAgro"
+ },
+ {
+  "id": "81047760-62c6-46fe-8081-b6b8193c073a",
+  "nome": "HSI CRÉDITO ESTRUTURADO FII RESP LTDA",
+  "cnpj": "57170846000197",
+  "classe_atual": "FII-FIAgro"
+ },
+ {
+  "id": "08104fd6-daae-47ca-8e1d-b29c32445464",
+  "nome": "IP PARTICIPACOES FICFIA BDR NIVEL I",
+  "cnpj": "29544764000120",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "c6a058b0-db8d-44f9-a8a8-409867e5121e",
+  "nome": "IP Participações IPG FIC FIA RL",
+  "cnpj": "12082452000149",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "cae5895b-4ab6-4068-8989-4a1c15080c0a",
+  "nome": "Itaú Artax Ultra Dist FICFIM RL",
+  "cnpj": "54006013000105",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "c5f5db21-85ae-4d0d-8499-7e8acb2ae440",
+  "nome": "Itau Janeiro Dist FICFIM RL",
+  "cnpj": "52285727000166",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "5ca3cb51-264d-4799-ae4f-d7c7daf22969",
+  "nome": "ITAU JANEIRO RF DISTRIBUIDOS FICFI",
+  "cnpj": "52342951000142",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "ebe4e204-dd3d-470c-bc1b-f4af1854ab29",
+  "nome": "JGP ECOSSISTEMA FIC FDS INC INV INFRA II",
+  "cnpj": "55204781000128",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "8dfa1717-ed7e-4bac-b779-eef47f8f3a95",
+  "nome": "Journey Endurance Debent Inc FIRF CrPr",
+  "cnpj": "31120420000135",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "4d33c0aa-107e-400b-8622-a4aa15c78821",
+  "nome": "KAPITALO K10 FICFIM ACCESS",
+  "cnpj": "43984537000146",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "8e68e8cb-6320-426c-b77e-05e41edaff0c",
+  "nome": "KINEA IPCA DINÂMICO II FUNDO DE INVESTIMENTO FINANCEIRO RENDA FIXA RESPONSABILIDADE LIMITADA",
+  "cnpj": "39586858000115",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "1e695e15-a8f9-4fb4-b02f-b51940fa7f0d",
+  "nome": "KINEA OPORTUNIDADE FIRF CrPr SUBCLASSE I",
+  "cnpj": "32990051000102",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "08eda330-0756-4c9c-9e3e-1f98512731e5",
+  "nome": "KP CrPr 35 FICFIM",
+  "cnpj": "38221267000181",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "e723baa9-c80b-4dd8-9d60-a479f6597225",
+  "nome": "KP CrPr FICFIM",
+  "cnpj": "28903657000188",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "8d8cd4bc-7164-4799-abe7-5b0da7abbb8e",
+  "nome": "LIBRA FIC FIDC CrPr",
+  "cnpj": "45274408000190",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "5c91f93c-c08f-44cb-89f6-907afd87176e",
+  "nome": "LOTUS TOWER II FII RESPONSABILIDADE L",
+  "cnpj": "62855536000146",
+  "classe_atual": "FII-FIAgro"
+ },
+ {
+  "id": "c5f291e5-76f2-40b7-a125-67cb0fb8d6d7",
+  "nome": "M8 Credit Opportunities FICFIM CrPr",
+  "cnpj": "26841302000186",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "03c855aa-30ba-4db1-821b-ab62806826b2",
+  "nome": "MAG CASH FIRF LP",
+  "cnpj": "17899612000160",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "a94e3ab9-bf7d-4ee8-b0a8-04e7c309cba8",
+  "nome": "MANATÍ RENDA IMOBILIÁRIA FII RL",
+  "cnpj": "63441263000156",
+  "classe_atual": "FII-FIAgro"
+ },
+ {
+  "id": "7d25f7ee-2720-4563-b03b-7451ccaccc66",
+  "nome": "Mapfre Confianza DI FIRFRef CrPr",
+  "cnpj": "51253495000100",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "300e12de-1ab5-4e2c-b3d8-030b2f101d3d",
+  "nome": "MAPFRE FIRF",
+  "cnpj": "08610270000126",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "15aff99b-ba28-451b-97d3-5d5e2ccab1ec",
+  "nome": "Matera RC Hedge FIM",
+  "cnpj": "10237439000196",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "cb5d67f3-5517-447f-9b94-f4f04b76ea90",
+  "nome": "MCA CrPr FICFIDC",
+  "cnpj": "19392834000118",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "8d8f9916-711b-4956-9753-51b1b5081bc7",
+  "nome": "MCA II FICFIDC",
+  "cnpj": "23711364000185",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "0e280e53-242e-4814-9c12-507d983ee8ac",
+  "nome": "Menestys I FICFIM CrPr",
+  "cnpj": "38226673000137",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "84a183ef-52ea-44db-b93d-372a83f111a8",
+  "nome": "MORE CRED IMOB FII",
+  "cnpj": "51192125000100",
+  "classe_atual": "FII-FIAgro"
+ },
+ {
+  "id": "5b908418-80b7-44ee-a36e-41d36055beb5",
+  "nome": "MORE PREMIUM CRED CORP RF CrPr LP",
+  "cnpj": "23600995000127",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "d294eaaf-2d52-477d-a914-e78ad8959d3d",
+  "nome": "Multiplica Multiagro FIDC - Senior",
+  "cnpj": "32388135000162",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "bbf01fab-c60c-43b8-8840-5be60e84ec2f",
+  "nome": "Nikos Ouro FIM",
+  "cnpj": "09601190000177",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "e30b96f1-d3ae-48b5-95c0-aaf8758965e9",
+  "nome": "Occam Ativo 30 Incentivado Infra FIRF CP",
+  "cnpj": "54344616000109",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "fc55c47a-f64b-476b-b662-af6f85ab050c",
+  "nome": "Occam Liquidez FICFIRF CrPr",
+  "cnpj": "46098897000139",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "897583c5-a1b6-4ea7-bfc7-02f03dfddcf9",
+  "nome": "ORGANON FICFIA",
+  "cnpj": "17400251000166",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "d38f80d3-004b-4e36-aa78-b016d06b6d9e",
+  "nome": "Ouro Preto Real FICFIRF LP",
+  "cnpj": "23970201000117",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "7044864d-8df4-4e97-9b45-3bbe347a56d1",
+  "nome": "Patria Credito Estrutura 365 FICFIM CrPr",
+  "cnpj": "49983891000132",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "777add81-25a1-4e80-a515-26a65004f6d4",
+  "nome": "PATRIA INFRA CREDITO DI I FIP I",
+  "cnpj": "63141464000138",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "9d0c7906-906b-4116-8b66-d585969ae20e",
+  "nome": "PIMCO GL FINANC CREDIT FICFIM IE",
+  "cnpj": "29066331000106",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "397098c1-f149-4a8d-ac4b-11bbf225742e",
+  "nome": "PIMCO INCOME DOLAR FICFIM IE LP RL",
+  "cnpj": "32225478000106",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "7cf67299-a342-4935-95ca-1ff588714fcb",
+  "nome": "PIPO CAPITAL II FI FINANCEIRO",
+  "cnpj": "57277937000126",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "1430ed57-f3a7-49bb-b19b-0a320968def7",
+  "nome": "PIPO CAPITAL II FIP MULT  CL A",
+  "cnpj": "57277830000188",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "5a625715-1c2a-4375-852d-9364f62c8063",
+  "nome": "Porto DI CrPr FIRef",
+  "cnpj": "18719154000101",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "b0069e2e-a68a-46ba-9c26-54eb7dbf0150",
+  "nome": "QUANTITAS MALLORCA FICFIM",
+  "cnpj": "22918359000185",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "decd4a0d-e126-4905-86b7-1aff190ce4d0",
+  "nome": "RB Capital Vitoria Debent Inc FICFIIIRF",
+  "cnpj": "27717045000138",
+  "classe_atual": "FII-FIAgro"
+ },
+ {
+  "id": "7813c3f6-2478-4d12-b20d-2dc31adb13d8",
+  "nome": "RBR FIP INFRA CREDITO",
+  "cnpj": "63976688000160",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "d10debd7-7524-4443-80fb-c7ca38518654",
+  "nome": "RBR OPORTUNIDADES FII RL",
+  "cnpj": "50352284000153",
+  "classe_atual": "FII-FIAgro"
+ },
+ {
+  "id": "0b94f471-3b41-4fb1-80d6-cac849888893",
+  "nome": "REAL INVESTOR FICFIA BDR NIVEL I",
+  "cnpj": "10500884000105",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "75745165-6ff8-46a4-b2d3-03ca5ea54f9f",
+  "nome": "RENDA MENSAL PRE FC FIDC",
+  "cnpj": "42013814000100",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "373a4cce-2ea7-45e9-996e-a160e7898610",
+  "nome": "RIZA EQUITUS REAL ESTATE FII RESP LTDA",
+  "cnpj": "57593613000105",
+  "classe_atual": "FII-FIAgro"
+ },
+ {
+  "id": "75126cea-4015-4089-993f-f1f164f26de6",
+  "nome": "ROOT CAPITAL CREDITO HG PLUS FICFIM CrPr",
+  "cnpj": "42405028000159",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "89a542ed-34c7-4cc1-8416-bd2a1cbc58b4",
+  "nome": "ROOT CAPITAL HIGH YIELD FICFIM CrPr",
+  "cnpj": "34431415000131",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "86f7f56d-331e-4f8d-b116-3e3b989e07ca",
+  "nome": "Safra Agilite FIRF CrPr RL",
+  "cnpj": "12796232000187",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "4126263b-69ba-4c30-9bf8-f3dfb379051d",
+  "nome": "Safra DI Master FIRFRefDI LP",
+  "cnpj": "02536364000116",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "a9e5a9cf-311c-4f94-80c6-bbf656054a00",
+  "nome": "Safra Extra Bancos Special FICFIRF CrPr",
+  "cnpj": "52242738000169",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "dcdebf38-9621-4261-be26-537b35553290",
+  "nome": "SOLIS CAPITAL ANTARES CrPr FICFIM LP",
+  "cnpj": "13054728000148",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "ddc34d5e-39ac-4cad-857d-acb5aa7b150a",
+  "nome": "Solis Capital Antares Pioneiro FICFIDC",
+  "cnpj": "55318040000178",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "fa48b6e9-eba7-486b-ad15-a0dbcc535419",
+  "nome": "SOLUTIONS FICFIM CrPr",
+  "cnpj": "49692303000101",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "a8af824e-b5e7-4ace-aad7-1002aabecf56",
+  "nome": "SPARTA DEB INCENTIVADAS ESTR FICINFRA RF",
+  "cnpj": "50038992000114",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "585dfeac-aca0-4fa2-b0dc-929215d23224",
+  "nome": "Sparta Debentures Incent 45 FICFIIIRF",
+  "cnpj": "36352361000144",
+  "classe_atual": "FII-FIAgro"
+ },
+ {
+  "id": "01afe439-a4fd-4419-9168-bdd1d3985ece",
+  "nome": "Sparta Debentures Incent IPCA FICFIIIRF",
+  "cnpj": "39959025000152",
+  "classe_atual": "FII-FIAgro"
+ },
+ {
+  "id": "462e84ef-8cd7-43ec-a2f3-42f83000041f",
+  "nome": "SPARTA PREMIUM FICFIRF",
+  "cnpj": "12923387000137",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "41bfbee9-d9b0-45f3-946a-786996a74a7d",
+  "nome": "Sparta Renda Incentivado Infra FIRF RL",
+  "cnpj": "54426679000104",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "e8db9d1e-2be4-453c-ac60-7bd2f8c124eb",
+  "nome": "SPARTA TOP FIC RF CrPr LP",
+  "cnpj": "14188162000100",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "95f12876-9842-459f-87e2-e9569446be57",
+  "nome": "SPX SEAHAWK FICFIRF CrPr LP ACCESS",
+  "cnpj": "35343590000130",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "e834cb39-417f-42f1-b7f4-4d25b888c06a",
+  "nome": "SPX Seahawk Global FICFIM CrPr RL",
+  "cnpj": "34781162000126",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "2ab6bb86-0996-406a-bd3f-1d83493f9a51",
+  "nome": "Sul America Excellence FIRF CrPr",
+  "cnpj": "04899128000190",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "d386e426-fd80-4798-9833-5ae0a84281f2",
+  "nome": "SUL AMERICA RETORNO TOTAL FIRF LP",
+  "cnpj": "23502654000119",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "c20dedd3-57a9-4861-9b55-89932d93ffdc",
+  "nome": "SULAMERICA PREMIUM PLUS FIRF REF DI CrPr",
+  "cnpj": "47715703000160",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "2e16d1a4-a4df-416d-b850-f10fb5c146d7",
+  "nome": "TARPON GT 90 FICFIA",
+  "cnpj": "42922205000174",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "69d28f87-bd3c-49d0-aff4-b7fa25731f5a",
+  "nome": "TARPON INTERSECTION FICFIA",
+  "cnpj": "34713026000107",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "76d57fd9-b979-4415-9669-a8d301447d3e",
+  "nome": "TARPON US EQUITIES I FIA IE",
+  "cnpj": "41269079000138",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "4d75d676-0493-4a39-8a06-0f9b6e4d3acd",
+  "nome": "TERRAMAGNA II FC FIAGRO FIDC RESP LIMIT",
+  "cnpj": "55054815000145",
+  "classe_atual": "FII-FIAgro"
+ },
+ {
+  "id": "7f0e2d8d-b585-4609-b713-6647a48c9363",
+  "nome": "V8 CASH FICFIRF",
+  "cnpj": "30509221000150",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "4acb10a0-5bd0-4efb-9e3f-63b579480a59",
+  "nome": "V8 CASH PLATINUM FIC RF CrPr",
+  "cnpj": "42774627000140",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "0b814266-c8b3-4b21-9ede-55182ea4e166",
+  "nome": "V8 GTO FICFIDC",
+  "cnpj": "46339885000159",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "2ff0ba26-aa73-4d99-84ec-8aa565e76625",
+  "nome": "V8 Mercury FIRF CrPr LP RL",
+  "cnpj": "58398452000153",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "ec6d1881-e098-4a5a-8c72-8e74d0b34c6d",
+  "nome": "VALORA AGRO RENDA SR2 FIAGRO DC RL",
+  "cnpj": "60743809000135",
+  "classe_atual": "FII-FIAgro"
+ },
+ {
+  "id": "5d84c403-7658-4c27-8360-9f517c24600f",
+  "nome": "VALORA GUARDIAN FIDC",
+  "cnpj": "11701985000107",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "74a55476-95c3-4052-afef-433a647f4a17",
+  "nome": "Valora Vanguard FIC FIDC",
+  "cnpj": "59657690000107",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "e1b64df9-2e11-40da-9e98-c8cee849c609",
+  "nome": "VBI CRED MULTI FII RESP LIMITADA",
+  "cnpj": "51802350000102",
+  "classe_atual": "FII-FIAgro"
+ },
+ {
+  "id": "56d50738-ca9b-4240-89bb-21c4e78cde42",
+  "nome": "WESTERN ASSET HIGH GRADE ONE FIC FIDC RE",
+  "cnpj": "55507846000104",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "f275e47e-2f78-4e5e-a38a-da3045e27695",
+  "nome": "WESTERN ASSET US INDEX 500 FIM",
+  "cnpj": "17453850000148",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "f6dc4c7e-1df9-4c62-8b0c-56621c7f7926",
+  "nome": "Western Credito Bancario Plus FIRF CrPr",
+  "cnpj": "49983964000196",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "92460134-d901-4fb8-9c3e-f1c3dcf0780b",
+  "nome": "PGBL ULTRA RENDA FIXA CREDITO PRIVADO",
+  "cnpj": "00000000010032",
+  "classe_atual": "Multimercado"
+ },
+ {
+  "id": "0788d46f-f658-46dc-bf8b-c8be47e7c200",
+  "nome": "VGBL ULTRA RENDA FIXA CREDITO PRIVADO",
+  "cnpj": "00000000010033",
+  "classe_atual": "Multimercado"
+ }
+]

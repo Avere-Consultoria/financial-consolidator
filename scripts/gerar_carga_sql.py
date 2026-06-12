@@ -82,7 +82,7 @@ for b in sorted(bancos_manuais):
 sql.append("")
 sql.append("-- ── Clientes (upsert por codigo_avere; consultor_id via codigo_interno → perfil) ──")
 for k in clientes:
-    cid = f"(SELECT perfil_id FROM consultores WHERE codigo_interno = {k['direto']})" if k["direto"] else "NULL"
+    cid = f"(SELECT id FROM consultores WHERE codigo_interno = {k['direto']})" if k["direto"] else "NULL"
     sql.append(
         f"INSERT INTO clientes (codigo_avere, nome, consultor_id) "
         f"VALUES ({q(k['cod'])}, {q(k['nome'])}, {cid}) "
@@ -118,12 +118,12 @@ bf = []
 bf.append("-- BACKFILL: liga clientes.consultor_id ao perfil do consultor já provisionado.")
 bf.append("-- Re-rode quando criar/provisionar logins de consultores. Idempotente.")
 pares = ",\n  ".join(f"({q(k['cod'])}, {k['direto']})" for k in clientes if k["direto"])
-bf.append("UPDATE clientes c SET consultor_id = co.perfil_id")
+bf.append("UPDATE clientes c SET consultor_id = co.id")
 bf.append("FROM (VALUES")
 bf.append("  " + pares)
 bf.append(") AS m(codigo_avere, codigo_interno)")
 bf.append("JOIN consultores co ON co.codigo_interno = m.codigo_interno")
-bf.append("WHERE c.codigo_avere = m.codigo_avere AND co.perfil_id IS NOT NULL;")
+bf.append("WHERE c.codigo_avere = m.codigo_avere;")
 with open(os.path.join(OUT, "backfill_consultor.sql"), "w", encoding="utf-8") as f:
     f.write("\n".join(bf))
 
