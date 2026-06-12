@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import * as crypto from 'crypto';
 import express from 'express';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
@@ -38,9 +39,16 @@ const CONSOLIDATOR_SECRET = process.env.CONSOLIDATOR_SECRET;
 if (!CONSOLIDATOR_SECRET) {
   logger.warn('⚠️  CONSOLIDATOR_SECRET não configurado — canal SEM proteção (defina a env var).');
 }
+// Comparação em tempo constante (anti timing-attack): compara digests SHA-256,
+// que têm tamanho fixo — não vaza nem o tamanho nem o ponto de divergência.
+const secretDigest = CONSOLIDATOR_SECRET
+  ? crypto.createHash('sha256').update(CONSOLIDATOR_SECRET).digest()
+  : null;
 app.use((req, res, next) => {
-  if (!CONSOLIDATOR_SECRET) return next(); // tolerante durante a transição (sem env)
-  if (req.get('x-api-key') !== CONSOLIDATOR_SECRET) {
+  if (!secretDigest) return next(); // tolerante durante a transição (sem env)
+  const provided = req.get('x-api-key') ?? '';
+  const providedDigest = crypto.createHash('sha256').update(provided).digest();
+  if (!crypto.timingSafeEqual(providedDigest, secretDigest)) {
     return res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } });
   }
   next();

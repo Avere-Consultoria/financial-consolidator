@@ -91,19 +91,34 @@ export async function resolverOuCriarCanonico(
 
   // ── 2. Não achou → cria canônico novo ──────────────────────────────────
   if (!ativoCanonicoId) {
+    // Mapa curado primeiro: identificador imutável → classe com certeza.
+    // CNPJ normalizado para 14 dígitos; demais chaves em maiúsculas.
+    const chaves = codigos.map((c) => {
+      const digitos = String(c).replace(/\D/g, '')
+      return digitos.length === 14 ? digitos : String(c).toUpperCase().trim()
+    })
+    const { data: hitMapa } = await supabase
+      .from('mapa_classificacao')
+      .select('classe_avere')
+      .in('chave', chaves)
+      .limit(1)
+    const classeMapa: string | null = hitMapa?.[0]?.classe_avere ?? null
+
+    const classeFinal = classeMapa ?? sugestao.classe_avere
     const { data: novo, error: errCreate } = await supabase
       .from('ativos_canonicos')
       .insert({
-        nome_canonico:      sugestao.nome_canonico,
-        classe_avere:       sugestao.classe_avere,
-        liquidez_avere:     sugestao.liquidez_avere,
-        data_vencimento:    sugestao.data_vencimento,
-        taxa_canonica:      sugestao.taxa_canonica,
-        taxa_formatada:     sugestao.taxa_formatada,
-        benchmark_canonico: sugestao.benchmark_canonico,
-        sub_tipo_canonico:  sugestao.sub_tipo_canonico,
-        is_fii:             sugestao.is_fii,
-        is_coe:             sugestao.is_coe,
+        nome_canonico:        sugestao.nome_canonico,
+        classe_avere:         classeFinal,
+        origem_classificacao: classeMapa ? 'mapa' : (classeFinal ? 'auto' : null),
+        liquidez_avere:       sugestao.liquidez_avere,
+        data_vencimento:      sugestao.data_vencimento,
+        taxa_canonica:        sugestao.taxa_canonica,
+        taxa_formatada:       sugestao.taxa_formatada,
+        benchmark_canonico:   sugestao.benchmark_canonico,
+        sub_tipo_canonico:    sugestao.sub_tipo_canonico,
+        is_fii:               sugestao.is_fii,
+        is_coe:               sugestao.is_coe,
       })
       .select('id')
       .single()
@@ -184,9 +199,13 @@ export function sugerirCanonicoComClassificacao(
   institution: Institution,
   override?: Partial<CanonicoSugerido>,
 ): CanonicoSugerido {
-  const isFii = detectarIsFii(asset.name, asset.extra?.isFII === true || asset.extra?.isFII === 'true')
+  const isFiiApi = asset.extra?.isFII === true || asset.extra?.isFII === 'true'
+  const isFii = detectarIsFii(asset.name, isFiiApi)
   const isCoe = detectarIsCoe(asset.name, asset.extra?.productType ?? asset.extra?.bondType)
 
+  // Classificação só aceita a flag explícita da API — nome não decide classe
+  // (princípio "classificação por certeza"; o is_fii por nome segue só como
+  // metadado de exibição).
   const classe = classifyAvere({
     assetClass:   asset.assetClass,
     institution,
@@ -196,7 +215,7 @@ export function sugerirCanonicoComClassificacao(
     indexRate:    asset.indexRate    ?? null,
     bondType:     asset.extra?.bondType ?? null,
     name:         asset.name         ?? null,
-    isFII:        isFii,
+    isFII:        isFiiApi,
     productType:  asset.extra?.productType ?? null,
   })
 

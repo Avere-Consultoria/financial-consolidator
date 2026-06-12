@@ -40,6 +40,20 @@ interface ManualAtivo {
 
 const SUBTIPOS_TESOURO = new Set(['NTN-B', 'NTNB', 'NTN-F', 'NTNF', 'NTN-C', 'NTNC', 'LTN', 'LFT'])
 
+// Comparação em tempo constante (anti timing-attack): compara digests SHA-256,
+// que têm tamanho fixo — não vaza tamanho nem ponto de divergência do segredo.
+async function segredoConfere(provided: string, expected: string): Promise<boolean> {
+  const enc = new TextEncoder()
+  const [a, b] = await Promise.all([
+    crypto.subtle.digest('SHA-256', enc.encode(provided)),
+    crypto.subtle.digest('SHA-256', enc.encode(expected)),
+  ])
+  const va = new Uint8Array(a), vb = new Uint8Array(b)
+  let diff = 0
+  for (let i = 0; i < va.length; i++) diff |= va[i] ^ vb[i]
+  return diff === 0
+}
+
 function nomeEmissor(a: ManualAtivo): string {
   return (a.emissor_nome ?? a.emissor ?? '').trim()
 }
@@ -69,10 +83,10 @@ function coletarIdentificadores(a: ManualAtivo): Identificador[] {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
-  // ── Auth do agente: segredo compartilhado ───────────────────────────────
+  // ── Auth do agente: segredo compartilhado (comparação em tempo constante) ──
   const expected = Deno.env.get('MANUAL_IMPORT_KEY')
-  const provided = req.headers.get('x-import-key')
-  if (!expected || provided !== expected) {
+  const provided = req.headers.get('x-import-key') ?? ''
+  if (!expected || !(await segredoConfere(provided, expected))) {
     return errorResponse('Não autorizado (x-import-key inválido).', 401)
   }
 

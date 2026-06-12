@@ -36,10 +36,27 @@ export function getXpBaseUrl(): string {
 
 export function getXpHttpsAgent(): https.Agent {
   try {
+    // Validação TLS ativa por padrão. Se o endpoint usar cadeia ICP-Brasil
+    // (fora da CA store do Node), fornecer a cadeia via XP_CA_BASE64/XP_CA_PATH.
+    // XP_TLS_INSECURE=true desliga a validação SOMENTE para desenvolvimento
+    // (ex.: certificado provisório atual) — nunca usar em produção.
+    const insecure = process.env.XP_TLS_INSECURE === 'true';
+    if (insecure) {
+      logger.warn('XP: validação TLS DESATIVADA (XP_TLS_INSECURE=true) — apenas dev');
+    }
+
+    let ca: Buffer | undefined;
+    try {
+      ca = loadCert('XP_CA_BASE64', 'XP_CA_PATH');
+    } catch {
+      ca = undefined; // cadeia extra é opcional
+    }
+
     return new https.Agent({
       cert: loadCert('XP_CERT_BASE64', 'XP_CERT_PATH'),
       key:  loadCert('XP_KEY_BASE64',  'XP_KEY_PATH'),
-      rejectUnauthorized: false, // ICP-Brasil não está na CA store do Node.js
+      ...(ca ? { ca } : {}),
+      rejectUnauthorized: !insecure,
     });
   } catch (err: any) {
     throw new ConsolidatorError(

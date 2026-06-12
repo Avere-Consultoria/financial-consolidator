@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { getAgoraHeaders, getAgoraHttpsAgent } from './auth';
 import { logger } from '../../utils/logger';
+import { maskDoc, maskUrl } from '../../utils/mask';
 import { ConsolidatorError } from '../../types';
 
 export async function getInvestorCode(cpfCnpj: string) {
@@ -15,7 +16,7 @@ export async function getInvestorCode(cpfCnpj: string) {
   const agent = getAgoraHttpsAgent();
 
   try {
-    logger.info(`Ágora: Buscando código CBLC para o CPF/CNPJ ${cpfCnpj}`);
+    logger.info(`Ágora: Buscando código CBLC para o CPF/CNPJ ${maskDoc(cpfCnpj)}`);
     
     // Passamos a configuração inteira no Axios, OMITINDO a propriedade 'data'
     const { data } = await axios({

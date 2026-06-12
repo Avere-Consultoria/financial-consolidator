@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { logger } from '../../utils/logger';
+import { maskDoc, maskUrl } from '../../utils/mask';
 import {
   UnifiedPosition,
   UnifiedAsset,
@@ -426,7 +427,7 @@ export async function getDetailedTerm(cpfCnpj: string, accountCode: string): Pro
 // Previdência: endpoint diferente — só CPF, sem accountCode
 export async function getDetailedPension(cpfCnpj: string): Promise<UnifiedAsset[]> {
   try {
-    logger.info(`Ágora: buscando previdência para CPF ${cpfCnpj}`);
+    logger.info(`Ágora: buscando previdência para CPF ${maskDoc(cpfCnpj)}`);
     const data = await agoraGet(`/consolidatedposition/pension/${cpfCnpj}`);
     return mapPension(extractArray(data, 'proposals', 'pension', 'plans'));
   } catch (err: any) {

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { logger } from '../../utils/logger';
+import { maskUrl } from '../../utils/mask';
 import { UnifiedPosition, UnifiedAsset, AssetClass, ConsolidatorError } from '../../types';
 import { getAgoraBaseUrl, getAgoraHeaders, getAgoraHttpsAgent } from './auth';
 
@@ -37,7 +38,7 @@ async function agoraRequest(path: string): Promise<any> {
   const headers = await getAgoraHeaders();
   const agent = getAgoraHttpsAgent();
 
-  logger.info(`Ágora: chamando URL: ${url}`);
+  logger.info(`Ágora: chamando URL: ${maskUrl(url)}`);
 
   const { data } = await axios.post(url, null, {
     headers,
@@ -57,10 +58,6 @@ export async function getAgoraConsolidatedPosition(
     const data = await agoraRequest(
       `${getBasePath()}/listsummary/${cpfCnpj}/${accountCode}`
     );
-
-    // 🚩 INSIRA OS LOGS AQUI PARA VER O QUE O BRADESCO MANDOU:
-    logger.info("=== DEBUG DATA BRUTA ===");
-    logger.info(JSON.stringify(data));
 
     // Sandbox retorna "allocation", produção retorna "result.products"
     const allocation = data?.allocation ?? {};

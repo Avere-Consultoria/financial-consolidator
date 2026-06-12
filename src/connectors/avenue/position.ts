@@ -4,9 +4,10 @@ import { UnifiedPosition } from '../../types';
 import { mapAvenueToUnifiedPosition } from './mapper';
 import { getAvenueAuc } from './auc';
 import { logger } from '../../utils/logger';
+import { maskDoc, maskUrl } from '../../utils/mask';
 
 export async function getAvenuePosition(accountNumber: string): Promise<UnifiedPosition> {
-  logger.info(`Buscando posições da Avenue para CPF/Código: ${accountNumber}`);
+  logger.info(`Buscando posições da Avenue para CPF/Código: ${maskDoc(accountNumber)}`);
 
   const dateObj = new Date();
   dateObj.setDate(dateObj.getDate() - 4);

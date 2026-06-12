@@ -3,6 +3,7 @@ import { getAvenueToken } from './auth';
 import { ConsolidatorError } from '../../types';
 import { AvenueAccountInsight } from '../../types';
 import { logger } from '../../utils/logger';
+import { maskDoc, maskUrl } from '../../utils/mask';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Avenue — Account Insights
@@ -23,7 +24,7 @@ export async function getAvenueAccountInsights(
   if (cpf) filters['account_insights.client_cpf'] = cpf;
 
   try {
-    logger.info(`Avenue: buscando account insights para ${date}${cpf ? ` | CPF: ${cpf}` : ''}`);
+    logger.info(`Avenue: buscando account insights para ${date}${cpf ? ` | CPF: ${maskDoc(cpf)}` : ''}`);
 
     const response = await axios.post(
       `${BASE_URL}/queries/run/json`,
@@ -56,7 +57,7 @@ export async function getAvenueAccountInsights(
     const status = err?.response?.status;
     const data = err?.response?.data;
 
-    logger.error('Avenue: erro ao buscar account insights', { date, cpf, status, data });
+    logger.error('Avenue: erro ao buscar account insights', { date, cpf: maskDoc(cpf), status, data });
 
     if (status === 401) {
       throw new ConsolidatorError('AVENUE_UNAUTHORIZED', 'Token Avenue inválido ou expirado', 'AVENUE', 401);

@@ -5,8 +5,8 @@
 // Reutilizável pelo classificador e por conectores (pós-sync).
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const SUBTIPOS_BANCARIO_FGC = new Set(['CDB', 'LCI', 'LCA', 'LF', 'LIG', 'RDB', 'LH', 'LC', 'LCD', 'DPGE', 'RDC']);
-export const SUBTIPOS_CREDITO_PRIVADO = new Set(['DEB', 'CRA', 'CRI', 'FIDC', 'NP', 'NC', 'CCB', 'CCI']);
+export const SUBTIPOS_BANCARIO_FGC = new Set(['CDB', 'LCI', 'LCA', 'LF', 'LIG', 'RDB', 'LH', 'LC', 'LCD', 'DPGE', 'RDC', 'LFSN']);
+export const SUBTIPOS_CREDITO_PRIVADO = new Set(['DEB', 'CRA', 'CRI', 'FIDC', 'NP', 'NC', 'CCB', 'CCI', 'CDCA']);
 
 const STOPWORDS = new Set([
     's', 'sa', 'as', 'sas', 'ltda', 'me', 'eireli', 'cia', 'de', 'do', 'da', 'dos', 'das',

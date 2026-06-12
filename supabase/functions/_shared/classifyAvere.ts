@@ -1,26 +1,26 @@
 import { parseDataFlexivel } from './dates.ts'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// AVERE Default Classification — v2
-// Lógica: vencimento vs liquidez → benchmark → assetClass
+// AVERE Default Classification — v3 "classificação por certeza"
 //
-// ⚠️  DECISÕES PENDENTES — debater com o Master antes de alterar
+// Princípio (decisão de gestão, 2026-06-11): só classificamos automaticamente
+// com lastro em dado imutável (assetClass, indexador, flag da API ou mapa
+// curado por identificador). NOME nunca decide classe. Sem certeza → null
+// ("A classificar") e o ativo entra na fila de revisão do Master.
 //
-// TODO-1  LFT / Tesouro Selic
-//         Tem maturityDate mas na prática funciona como caixa diário.
-//         Atualmente entra como RF-Pós-fixado (tem vencimento → segue a árvore RF).
-//         Para mudar para Caixa, descomente a linha marcada com [TODO-1] abaixo.
+// O mapa curado (tabela mapa_classificacao: CNPJ/ticker/ISIN/código → classe)
+// é consultado em canonico.ts ANTES desta função valer como fallback.
 //
-// TODO-2  CDB / LCI / LCA com isLiquidity = true
-//         Tem vencimento E flag de liquidez diária ao mesmo tempo.
-//         Atualmente: isLiquidity=true → Caixa (liquidez vence o vencimento).
-//         Para manter sempre como RF independente da liquidez,
-//         remova a linha marcada com [TODO-2] abaixo.
+// Mudanças v2 → v3:
+//   • INVESTMENT_FUND não vira mais 'Multimercado' por padrão → null
+//   • PENSION não vira mais 'Multimercado' → null (Master decide)
+//   • RF sem indexador identificável não cai mais em 'Pós-fixado' → null
+//   • DERIVATIVE sem marca de COE não cai mais em 'Alternativos' → null
+//   • EQUITIES com ticker de fundo listado (final 11) → null (FII? ETF? mapa decide)
+//   • default final não é mais 'Alternativos' → null
 //
-// TODO-3  Avenue — bonds internacionais
-//         Sem dados de benchmark da API; todos entram como RF Prefixado.
-//         Para diferenciar floating/inflation seria preciso dados extras.
-//         Por ora o master ajusta manualmente os casos excepcionais.
+// TODO-3 (mantido): Avenue sem benchmark da API; bonds → Intl RF Prefixado
+//         (grosso, sem CNPJ BR para resolver via mapa; Master ajusta exceções).
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type ClasseAvere =
@@ -54,12 +54,13 @@ export interface ClassifyInput {
   productType?:  string | null   // Avenue: 'Stocks', 'Bonds', 'Balance', etc.
 }
 
-export function classifyAvere(p: ClassifyInput): ClasseAvere {
+export function classifyAvere(p: ClassifyInput): ClasseAvere | null {
   const { assetClass, institution } = p
   const bench    = `${p.benchMark ?? ''} ${p.indexRate ?? ''}`.toUpperCase().trim()
   const bondType = `${p.bondType ?? ''} ${p.subTipo ?? ''}`.toUpperCase().trim()
   const name     = (p.name ?? '').toUpperCase()
   const prodType = (p.productType ?? '').toUpperCase()
+  const ticker   = (p.subTipo ?? '').toUpperCase().trim()
 
   // ── Avenue — tudo é Internacional ──────────────────────────────────────────
   if (institution === 'AVENUE') {
@@ -77,54 +78,53 @@ export function classifyAvere(p: ClassifyInput): ClasseAvere {
   if (assetClass === 'CASH')      return 'Conta Corrente'
   if (assetClass === 'CRYPTO')    return 'Alternativos'
   if (assetClass === 'COMMODITY') return 'Alternativos'
-  if (assetClass === 'EQUITIES')  return 'Renda Variável'
-  if (assetClass === 'PENSION')   return 'Multimercado'
+
+  if (assetClass === 'EQUITIES') {
+    // Ticker B3 final 11/11B = fundo listado (FII? FIAgro? ETF?) — só o mapa
+    // curado distingue; sem mapa, fica para revisão.
+    if (/11B?$/.test(ticker)) return null
+    return 'Renda Variável'
+  }
+
+  // Previdência: composição interna varia (RF/MM/ações) — Master decide. [R1]
+  if (assetClass === 'PENSION') return null
 
   if (assetClass === 'DERIVATIVE') {
-    if (bondType.includes('COE') || name.includes('COE')) return 'COE'
-    return 'Alternativos'
+    // 'COE' como token é rótulo explícito de produto estruturado (não é
+    // heurística de nome livre); os códigos CETIP de COE estão no mapa.
+    if (bondType.includes('COE') || /\bCOE\b/.test(name)) return 'COE'
+    return null
   }
 
+  // Fundos: classe vem do mapa curado por CNPJ (canonico.ts). Aqui só a flag
+  // explícita da API conta; nome NÃO decide. Sem certeza → revisão.
   if (assetClass === 'INVESTMENT_FUND') {
     if (p.isFII === true) return 'FII-FIAgro'
-    if (
-      name.includes('FII')          ||
-      name.includes('FIAGRO')       ||
-      name.includes('FI-AGRO')      ||
-      name.includes('IMOBILIÁRIO')  ||
-      name.includes('IMOBILIARIO')
-    ) return 'FII-FIAgro'
-    return 'Multimercado'
+    return null
   }
 
-  // ── Renda Fixa — árvore principal: vencimento vs liquidez ─────────────────
+  // ── Renda Fixa — certeza vem do INDEXADOR (dado imutável da API) ──────────
   if (assetClass === 'FIXED_INCOME') {
 
-    // [TODO-1] LFT → descomentar para classificar como Caixa em vez de RF
-    // if (/\bLFT\b/.test(bondType) || name.includes('TESOURO SELIC')) return 'Caixa'
-
-    // [TODO-2] isLiquidity → Caixa (liquidez diária vence o vencimento)
-    // Para manter sempre como RF, remova a linha abaixo:
+    // Liquidez diária sem vencimento = caixa (conta remunerada etc.)
     if (p.isLiquidity && !p.maturityDate) return 'Caixa'
-
-    // Sem data de vencimento = ativo em aberto (ex: conta remunerada) → Caixa
     if (!p.maturityDate) return 'Caixa'
 
-    // ── Tem vencimento → sub-classificar pelo benchmark ────────────────────
-    if (/IPCA|IGP|INPC/.test(bench))               return 'RF - Inflação'
-    if (/\bPRE\b|PREFIXADO/.test(bench))            return 'RF - Prefixado'
+    // Indexador explícito
+    if (/IPCA|IGP|INPC/.test(bench))                 return 'RF - Inflação'
+    if (/\bPRE\b|PREFIXADO/.test(bench))             return 'RF - Prefixado'
+    if (/CDI|SELIC|\bDI\b/.test(bench))              return 'RF - Pós-fixado'
 
     // Tipo do título como segunda fonte (Ágora bondType / BTG subTipo)
-    if (/NTN-B/.test(bondType))                    return 'RF - Inflação'
-    if (/\bLTN\b|NTN-F/.test(bondType))            return 'RF - Prefixado'
-    // [TODO-1] LFT inline — descomentar se quiser Caixa:
-    // if (/\bLFT\b/.test(bondType))               return 'Caixa'
+    if (/NTN-B/.test(bondType))                      return 'RF - Inflação'
+    if (/\bLTN\b|NTN-F/.test(bondType))              return 'RF - Prefixado'
+    if (/\bLFT\b/.test(bondType))                    return 'RF - Pós-fixado'
 
-    // CDI/DI/SELIC ou sem benchmark → padrão pós-fixado
-    return 'RF - Pós-fixado'
+    // Sem indexador identificável → não chutamos mais Pós-fixado
+    return null
   }
 
-  return 'Alternativos'
+  return null
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
