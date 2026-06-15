@@ -164,10 +164,15 @@ async function resolverCanonicoXP(supabase: any, a: UnifiedAsset): Promise<strin
 
   const subTipoNormalizado = normalizarSubTipo(resolverSubTipo(a))
 
+  // A XP entrega a taxa já formatada em taxaCompleta (vem em a.indexRate p/ RF),
+  // ex.: "IPC-A +7,55%" / "126,00% CDI". Usa direto como taxa (override).
+  const override: Record<string, any> = { sub_tipo_canonico: subTipoNormalizado }
+  if (a.indexRate) { override.taxa_canonica = a.indexRate; override.taxa_formatada = a.indexRate }
+
   return await resolverOuCriarCanonico(
     supabase,
     lookup,
-    sugerirCanonicoComClassificacao(a, 'XP', { sub_tipo_canonico: subTipoNormalizado }),
+    sugerirCanonicoComClassificacao(a, 'XP', override),
     {
       instituicao_origem:      'XP',
       identificador_principal: principal,
@@ -302,6 +307,10 @@ function calcularTotais(parsed: ParsedXP[]) {
 }
 
 function resolverSubTipo(a: UnifiedAsset): string {
+  // A XP entrega a categoria pronta (CDB/DEB/CRA/CRI/LF/NTN-B/LFT/LTN/CDCA/COE)
+  // em extra.subTipo — é a fonte mais confiável. normalizarSubTipo padroniza depois.
+  if (a.extra?.subTipo) return String(a.extra.subTipo).toUpperCase().trim()
+
   const type = (a.extra?.productType ?? a.extra?.productCategory ?? '').toLowerCase()
   if (!type) return mapSubTipoPadrao(a.assetClass)
   if (type.includes('cdb'))                                       return 'CDB'
