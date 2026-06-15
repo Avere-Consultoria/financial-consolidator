@@ -100,12 +100,25 @@ const str = (...vs: any[]): string | undefined => {
   return undefined;
 };
 
+// Coleta arrays de objetos em QUALQUER nível (a XP aninha tudo em posicaoDetalhada)
+function coletarArrays(obj: any, achados: Record<string, any[]> = {}, prof = 0): Record<string, any[]> {
+  if (!obj || typeof obj !== 'object' || prof > 6) return achados;
+  for (const [k, v] of Object.entries(obj)) {
+    if (Array.isArray(v)) {
+      if (v.length && typeof v[0] === 'object') achados[k] = (achados[k] ?? []).concat(v as any[]);
+    } else if (v && typeof v === 'object') {
+      coletarArrays(v, achados, prof + 1);
+    }
+  }
+  return achados;
+}
+
 function mapXpPosition(data: any, accountNumber: string): UnifiedPosition {
   const assets: UnifiedAsset[] = [];
-  const positionDate = str(data.positionDate, data.dataPosicao, data.referenceDate) ?? new Date().toISOString();
+  const positionDate = str(data.positionDate, data.dataPosicao, data.referenceDate, data.atualizeEm) ?? new Date().toISOString();
 
-  for (const [chave, valor] of Object.entries(data)) {
-    if (!Array.isArray(valor)) continue;
+  const grupos = coletarArrays(data);
+  for (const [chave, valor] of Object.entries(grupos)) {
     const assetClass = XP_ARRAY_CLASSE[chave] ?? 'OTHER';
     for (const item of valor as any[]) {
       const grossValue = num(item.grossValue, item.valorBruto, item.financialValue, item.valorMercado,
@@ -145,13 +158,17 @@ function mapXpPosition(data: any, accountNumber: string): UnifiedPosition {
 // sem valores — para confirmar os nomes reais e afinar o mapper sem vazar PII.
 function logarEstruturaXP(data: any): void {
   try {
+    const grupos = coletarArrays(data);
     const arrays: Record<string, { len: number; campos: string[] }> = {};
-    const topo: string[] = [];
-    for (const [k, v] of Object.entries(data ?? {})) {
-      if (Array.isArray(v)) arrays[k] = { len: v.length, campos: v[0] ? Object.keys(v[0]) : [] };
-      else topo.push(k);
+    for (const [k, v] of Object.entries(grupos)) {
+      arrays[k] = { len: v.length, campos: v[0] ? Object.keys(v[0]) : [] };
     }
-    logger.info('XP: estrutura da resposta', { topo, arrays });
+    logger.info('XP: estrutura da resposta', {
+      topo: Object.keys(data ?? {}),
+      dadoAtualizado: data?.dadoAtualizado,   // flag de prontidão (assíncrono)
+      atualizeEm: data?.atualizeEm,
+      arrays,                                  // arrays achados em QUALQUER nível + campos
+    });
   } catch { /* diagnóstico best-effort */ }
 }
 
