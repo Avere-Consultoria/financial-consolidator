@@ -23,24 +23,37 @@ export async function getXpPosition(accountNumber: string): Promise<UnifiedPosit
     logger.info(`XP: buscando posição consolidada da conta ${accountNumber}`);
 
     // ── Posição Consolidada ──────────────────────────────────────────────────
-    const response = await axios.get(
+    // A XP é assíncrona: a 1ª chamada dispara o cálculo (dadoAtualizado=false).
+    // Em vez de devolver erro na hora, fazemos polling por até ~90s para que o
+    // clique manual "só funcione". No sync agendado, a posição já chega pronta
+    // (o tique anterior esquentou), então normalmente nem entra no loop.
+    const buscar = async () => (await axios.get(
       `${baseUrl}/data-access/api/v1/consolidated-positions/customer/${accountNumber}`,
       {
         httpsAgent: agent,
-        timeout: 45_000,   // falha clara em vez de pendurar até o 504 do gateway
+        timeout: 45_000,
         headers: {
           'Ocp-Apim-Subscription-Key': subscriptionKey,
           Authorization: `Bearer ${token}`,
-          // XP devolve 403 sem o User-Agent de parceiro (bloqueia o default do axios).
           'User-Agent': 'XPparceiro/AvereConsultoria',
           Accept: '*/*',
           'Content-Type': 'application/json',
         },
-        // endpoint é por cliente (customerCode no path) — não usa $filter/$top de OData
-      }
-    );
+      },
+    )).data ?? {};
 
-    const data = response.data ?? {};
+    const MAX_TENTATIVAS = 6;
+    const ESPERA_MS = 15_000;
+    let data: any = {};
+    for (let i = 0; i < MAX_TENTATIVAS; i++) {
+      data = await buscar();
+      if (data?.dadoAtualizado !== false) break;   // pronta (true ou sem flag)
+      if (i < MAX_TENTATIVAS - 1) {
+        logger.info(`XP: posição ainda preparando (tentativa ${i + 1}), aguardando…`);
+        await new Promise((r) => setTimeout(r, ESPERA_MS));
+      }
+    }
+
     logarEstruturaXP(data);   // estrutura (só nomes de campos, sem valores) p/ ajustar o mapper
     return mapXpPosition(data, accountNumber);
   } catch (err: any) {
