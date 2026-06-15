@@ -23,11 +23,11 @@ export async function getXpPosition(accountNumber: string): Promise<UnifiedPosit
     logger.info(`XP: buscando posição consolidada da conta ${accountNumber}`);
 
     // ── Posição Consolidada ──────────────────────────────────────────────────
-    // A XP é assíncrona: a 1ª chamada dispara o cálculo (dadoAtualizado=false).
-    // Em vez de devolver erro na hora, fazemos polling por até ~90s para que o
-    // clique manual "só funcione". No sync agendado, a posição já chega pronta
-    // (o tique anterior esquentou), então normalmente nem entra no loop.
-    const buscar = async () => (await axios.get(
+    // Chamada ÚNICA. A XP é assíncrona (dadoAtualizado=false enquanto prepara),
+    // e cada chamada empurra o horário de prontidão — então NÃO se faz polling
+    // (martelar reseta o cronômetro da XP). Se vier pendente, mapXpPosition
+    // devolve um erro claro; o sync agendado tenta de novo no próximo tique.
+    const response = await axios.get(
       `${baseUrl}/data-access/api/v1/consolidated-positions/customer/${accountNumber}`,
       {
         httpsAgent: agent,
@@ -40,20 +40,9 @@ export async function getXpPosition(accountNumber: string): Promise<UnifiedPosit
           'Content-Type': 'application/json',
         },
       },
-    )).data ?? {};
+    );
 
-    const MAX_TENTATIVAS = 6;
-    const ESPERA_MS = 15_000;
-    let data: any = {};
-    for (let i = 0; i < MAX_TENTATIVAS; i++) {
-      data = await buscar();
-      if (data?.dadoAtualizado !== false) break;   // pronta (true ou sem flag)
-      if (i < MAX_TENTATIVAS - 1) {
-        logger.info(`XP: posição ainda preparando (tentativa ${i + 1}), aguardando…`);
-        await new Promise((r) => setTimeout(r, ESPERA_MS));
-      }
-    }
-
+    const data = response.data ?? {};
     logarEstruturaXP(data);   // estrutura (só nomes de campos, sem valores) p/ ajustar o mapper
     return mapXpPosition(data, accountNumber);
   } catch (err: any) {
@@ -124,10 +113,14 @@ function coletarArrays(obj: any, achados: Record<string, any[]> = {}, prof = 0):
 // previdencia, coe, acoes, ...}. Cada classe é { nome, itens:[], saldo, ... }.
 // O patrimônio total é posicaoDetalhada.patrimonioTotal e fecha com a soma dos saldos.
 function mapXpPosition(data: any, accountNumber: string): UnifiedPosition {
-  // A XP é assíncrona: a 1ª chamada prepara, a 2ª entrega. Não grava posição vazia.
+  // A XP é assíncrona: a 1ª chamada prepara, a 2ª (espaçada) entrega. Não grava
+  // posição vazia. Inclui o horário previsto (atualizeEm) para o usuário saber
+  // quando tentar de novo — sem martelar (cada chamada empurra o prazo).
   if (data?.dadoAtualizado === false) {
+    const quando = data?.atualizeEm
+      ? ` (prevista para ~${new Date(data.atualizeEm).toLocaleTimeString('pt-BR')})` : '';
     throw new ConsolidatorError('XP_DATA_PENDING',
-      'Posição XP ainda sendo preparada pela XP — sincronize novamente em instantes', 'XP', 425);
+      `Posição XP em preparação pela XP${quando} — aguarde ~1 min e sincronize de novo`, 'XP', 425);
   }
 
   const pd = data?.posicaoDetalhada ?? {};
