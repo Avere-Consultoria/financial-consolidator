@@ -27,6 +27,7 @@ export async function getXpPosition(accountNumber: string): Promise<UnifiedPosit
       `${baseUrl}/data-access/api/v1/consolidated-positions/customer/${accountNumber}`,
       {
         httpsAgent: agent,
+        timeout: 45_000,   // falha clara em vez de pendurar até o 504 do gateway
         headers: {
           'Ocp-Apim-Subscription-Key': subscriptionKey,
           Authorization: `Bearer ${token}`,
@@ -35,10 +36,7 @@ export async function getXpPosition(accountNumber: string): Promise<UnifiedPosit
           Accept: '*/*',
           'Content-Type': 'application/json',
         },
-        params: {
-          $filter: `(dimAccountCode eq '${accountNumber}')`,
-          $top: 50000,
-        },
+        // endpoint é por cliente (customerCode no path) — não usa $filter/$top de OData
       }
     );
 
