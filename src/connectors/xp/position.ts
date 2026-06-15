@@ -113,16 +113,6 @@ function coletarArrays(obj: any, achados: Record<string, any[]> = {}, prof = 0):
 // previdencia, coe, acoes, ...}. Cada classe é { nome, itens:[], saldo, ... }.
 // O patrimônio total é posicaoDetalhada.patrimonioTotal e fecha com a soma dos saldos.
 function mapXpPosition(data: any, accountNumber: string): UnifiedPosition {
-  // A XP é assíncrona: a 1ª chamada prepara, a 2ª (espaçada) entrega. Não grava
-  // posição vazia. Inclui o horário previsto (atualizeEm) para o usuário saber
-  // quando tentar de novo — sem martelar (cada chamada empurra o prazo).
-  if (data?.dadoAtualizado === false) {
-    const quando = data?.atualizeEm
-      ? ` (prevista para ~${new Date(data.atualizeEm).toLocaleTimeString('pt-BR')})` : '';
-    throw new ConsolidatorError('XP_DATA_PENDING',
-      `Posição XP em preparação pela XP${quando} — aguarde ~1 min e sincronize de novo`, 'XP', 425);
-  }
-
   const pd = data?.posicaoDetalhada ?? {};
   const assets: UnifiedAsset[] = [];
   const positionDate = str(pd?.financeiro?.dataPosicaoD0, pd?.dataAtualizacao) ?? new Date().toISOString();
@@ -220,6 +210,16 @@ function mapXpPosition(data: any, accountNumber: string): UnifiedPosition {
   if (prov) assets.push({ assetClass: 'OTHER', name: 'Proventos de Renda Fixa', grossValue: prov, netValue: prov, extra: { grupoXp: 'proventos' } });
 
   const totalAmount = num(pd?.patrimonioTotal) || assets.reduce((s, a) => s + (a.grossValue ?? 0), 0);
+
+  // "Em preparação" só vale quando a XP não devolveu posição ALGUMA. Quando
+  // dadoAtualizado:false vem ACOMPANHADO da posição (último cálculo válido enquanto a
+  // XP recalcula), usamos esses dados — descartá-los era o bug que travava a sync.
+  if (assets.length === 0 && totalAmount === 0 && data?.dadoAtualizado === false) {
+    const quando = data?.atualizeEm
+      ? ` (prevista para ~${new Date(data.atualizeEm).toLocaleTimeString('pt-BR')})` : '';
+    throw new ConsolidatorError('XP_DATA_PENDING',
+      `Posição XP em preparação pela XP${quando} — aguarde ~1 min e sincronize de novo`, 'XP', 425);
+  }
 
   return {
     institution: 'XP',
