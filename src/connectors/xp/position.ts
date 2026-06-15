@@ -30,7 +30,10 @@ export async function getXpPosition(accountNumber: string): Promise<UnifiedPosit
         headers: {
           'Ocp-Apim-Subscription-Key': subscriptionKey,
           Authorization: `Bearer ${token}`,
+          // XP devolve 403 sem o User-Agent de parceiro (bloqueia o default do axios).
+          'User-Agent': 'XPparceiro/AvereConsultoria',
           Accept: '*/*',
+          'Content-Type': 'application/json',
         },
         params: {
           $filter: `(dimAccountCode eq '${accountNumber}')`,
