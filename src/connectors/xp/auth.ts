@@ -52,6 +52,18 @@ export function getXpHttpsAgent(): https.Agent {
       ca = undefined; // cadeia extra é opcional
     }
 
+    // Opção 1 (mais simples): o .pfx/.p12 inteiro (cert + chave juntos), como a
+    // XP entrega. Base64 do arquivo + senha em XP_PFX_PASSWORD. Sem openssl.
+    if (process.env.XP_PFX_BASE64 || process.env.XP_PFX_PATH) {
+      return new https.Agent({
+        pfx: loadCert('XP_PFX_BASE64', 'XP_PFX_PATH'),
+        passphrase: process.env.XP_PFX_PASSWORD,
+        ...(ca ? { ca } : {}),
+        rejectUnauthorized: !insecure,
+      });
+    }
+
+    // Opção 2: cert + chave em PEM separados (XP_CERT_* / XP_KEY_*).
     return new https.Agent({
       cert: loadCert('XP_CERT_BASE64', 'XP_CERT_PATH'),
       key:  loadCert('XP_KEY_BASE64',  'XP_KEY_PATH'),

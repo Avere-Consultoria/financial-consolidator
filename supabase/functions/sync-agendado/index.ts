@@ -84,20 +84,31 @@ Deno.serve(async (req) => {
   }
 
   // ── Dispara cada conta em modo sistema (sequencial; respeita rate limit) ────
+  // Orçamento de tempo: a edge function tem teto (~150s). Processa o que couber
+  // dentro de ORCAMENTO_MS e devolve o resto à fila (o próximo tique/clique pega).
+  // Cada chamada tem timeout próprio pra uma conta travada não derrubar o lote.
   const baseUrl = Deno.env.get('SUPABASE_URL') ?? ''
   const apikey = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-  let ok = 0, erro = 0
+  const ORCAMENTO_MS = 110_000
+  const TIMEOUT_CONTA_MS = 30_000
+  const inicio = Date.now()
+  let ok = 0, erro = 0, processados = 0
   const falhas: Array<{ contaId: string; inst: string; msg: string }> = []
 
   for (const c of pendentes) {
+    if (Date.now() - inicio > ORCAMENTO_MS) break   // estoura o orçamento → para; resto fica na fila
     const inst = (c as any).instituicoes?.codigo as string
     const fn = FN[inst]
     if (!fn) { erro++; falhas.push({ contaId: c.id, inst, msg: 'instituição sem function' }); continue }
+    processados++
+    const ctrl = new AbortController()
+    const t = setTimeout(() => ctrl.abort(), TIMEOUT_CONTA_MS)
     try {
       const res = await fetch(`${baseUrl}/functions/v1/${fn}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-cron-secret': cronSecret, apikey },
         body: JSON.stringify({ contaId: c.id }),
+        signal: ctrl.signal,
       })
       if (!res.ok) {
         const txt = await res.text().catch(() => '')
@@ -106,24 +117,27 @@ Deno.serve(async (req) => {
       ok++
     } catch (e) {
       erro++
-      const msg = (e as Error)?.message ?? 'erro'
+      const msg = (e as Error)?.name === 'AbortError' ? `timeout (${TIMEOUT_CONTA_MS / 1000}s)` : ((e as Error)?.message ?? 'erro')
       falhas.push({ contaId: c.id, inst, msg })
-      // carimba o erro na conta (a function só carimba sucesso)
       await supabase.from('cliente_contas')
         .update({ ultimo_status: 'erro', ultimo_erro: msg }).eq('id', c.id)
+    } finally {
+      clearTimeout(t)
     }
   }
 
   // ── Log da rodada ────────────────────────────────────────────────────────────
   await supabase.from('sync_log').insert({
-    iniciado_em: new Date().toISOString(),
+    iniciado_em: new Date(inicio).toISOString(),
     finalizado_em: new Date().toISOString(),
     origem,
-    total: pendentes.length,
+    total: processados,
     ok,
     erro,
     detalhe: falhas.length ? { falhas: falhas.slice(0, 50) } : null,
   })
 
-  return jsonResponse({ origem, total: pendentes.length, ok, erro })
+  // restantes = selecionados que não couberam no orçamento (voltam à fila)
+  const restantes = pendentes.length - processados
+  return jsonResponse({ origem, total: processados, ok, erro, restantes })
 })
