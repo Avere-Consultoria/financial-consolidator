@@ -79,16 +79,10 @@ export async function getXpPosition(accountNumber: string): Promise<UnifiedPosit
 // nomes exatos dos campos variam — o logarEstruturaXP ajuda a confirmar).
 // ─────────────────────────────────────────────────────────────────────────────
 
-const XP_ARRAY_CLASSE: Record<string, AssetClass> = {
-  acoes: 'EQUITIES', acoesEListados: 'EQUITIES', rendaVariavel: 'EQUITIES',
-  fundos: 'INVESTMENT_FUND', fundosInvestimento: 'INVESTMENT_FUND',
-  rendaFixa: 'FIXED_INCOME', tesouroDireto: 'FIXED_INCOME',
-  previdencia: 'PENSION',
-  coe: 'OTHER',
-  opcoes: 'DERIVATIVE', termos: 'DERIVATIVE', bmf: 'DERIVATIVE', futuros: 'DERIVATIVE',
-  ouro: 'COMMODITY',
-  alugueis: 'EQUITIES',
-  saldoConta: 'CASH', contaCorrente: 'CASH', caixa: 'CASH',
+// "D+59 (Dias Corridos)" → 59
+const parseDplus = (s?: string): number => {
+  const m = /D\+(\d+)/i.exec(s ?? '');
+  return m ? parseInt(m[1], 10) : 0;
 };
 
 const num = (...vs: any[]): number => {
@@ -113,35 +107,113 @@ function coletarArrays(obj: any, achados: Record<string, any[]> = {}, prof = 0):
   return achados;
 }
 
+// Estrutura real: data.posicaoDetalhada.{financeiro, fundos, rendaFixa, tesouroDireto,
+// previdencia, coe, acoes, ...}. Cada classe é { nome, itens:[], saldo, ... }.
+// O patrimônio total é posicaoDetalhada.patrimonioTotal e fecha com a soma dos saldos.
 function mapXpPosition(data: any, accountNumber: string): UnifiedPosition {
-  const assets: UnifiedAsset[] = [];
-  const positionDate = str(data.positionDate, data.dataPosicao, data.referenceDate, data.atualizeEm) ?? new Date().toISOString();
+  // A XP é assíncrona: a 1ª chamada prepara, a 2ª entrega. Não grava posição vazia.
+  if (data?.dadoAtualizado === false) {
+    throw new ConsolidatorError('XP_DATA_PENDING',
+      'Posição XP ainda sendo preparada pela XP — sincronize novamente em instantes', 'XP', 425);
+  }
 
-  const grupos = coletarArrays(data);
-  for (const [chave, valor] of Object.entries(grupos)) {
-    const assetClass = XP_ARRAY_CLASSE[chave] ?? 'OTHER';
-    for (const item of valor as any[]) {
-      const grossValue = num(item.grossValue, item.valorBruto, item.financialValue, item.valorMercado,
-                              item.marketValue, item.valorLiquido, item.netValue, item.value, item.amount, item.saldo);
+  const pd = data?.posicaoDetalhada ?? {};
+  const assets: UnifiedAsset[] = [];
+  const positionDate = str(pd?.financeiro?.dataPosicaoD0, pd?.dataAtualizacao) ?? new Date().toISOString();
+
+  // 1. Caixa / disponível
+  const disp = num(pd?.financeiro?.valorTotal, pd?.valorDisponivel);
+  if (disp) assets.push({ assetClass: 'CASH', name: 'Disponível', grossValue: disp, netValue: disp, extra: { grupoXp: 'financeiro' } });
+
+  // 2. Fundos
+  for (const it of (pd?.fundos?.itens ?? [])) {
+    assets.push({
+      assetClass: 'INVESTMENT_FUND',
+      name: it.nomeFundo ?? 'Fundo XP',
+      quantity: num(it.quantidadeCotas),
+      marketPrice: num(it.valorCota),
+      grossValue: num(it.valorBruto, it.valorAtual),
+      netValue: num(it.valorLiquido),
+      incomeTax: num(it.valorImpostoRenda),
+      extra: {
+        cnpj: it.cnpj,
+        fundLiquidity: parseDplus(it.periodoCotizacaoResgate) + parseDplus(it.periodoLiquidacaoResgate),
+        grupoXp: 'fundos',
+      },
+    });
+  }
+
+  // 3. Renda Fixa + Tesouro Direto (mesma forma de item)
+  for (const grp of ['rendaFixa', 'tesouroDireto']) {
+    for (const it of (pd?.[grp]?.itens ?? [])) {
       assets.push({
-        assetClass,
-        name: str(item.productName, item.nome, item.name, item.ativo, item.descricao, item.ticker, item.symbol) ?? `XP ${chave}`,
-        ticker: str(item.ticker, item.symbol, item.codigo, item.codigoNegociacao),
-        securityCode: str(item.productCode, item.codigoProduto, item.isin),
-        quantity: num(item.quantity, item.quantidade, item.qtd, item.shares),
-        marketPrice: num(item.unitPrice, item.precoUnitario, item.precoMercado, item.lastPrice),
-        grossValue,
-        netValue: num(item.netValue, item.valorLiquido) || grossValue,
-        incomeTax: num(item.incomeTax, item.ir, item.imposto),
-        maturityDate: str(item.maturityDate, item.vencimento, item.dataVencimento),
-        benchMark: str(item.indexer, item.indexador, item.benchmark),
-        extra: { grupoXp: chave },
+        assetClass: 'FIXED_INCOME',
+        name: str(it.nickName, it.nomeAtivo) ?? 'Título XP',
+        ticker: str(it.codigoCetipSelic),
+        quantity: num(it.quantidadeTotal, it.quantidadeDisponivel),
+        marketPrice: num(it.precoUnitario),
+        grossValue: num(it.valorFinanceiroBruto),
+        netValue: num(it.valorFinanceiroLiquido),
+        incomeTax: num(it.valorIr),
+        maturityDate: str(it.dataVencimento),
+        benchMark: str(it.nomeIndexador),
+        indexRate: str(it.taxaCompleta),
+        isLiquidity: it.indicadorTipoLiquidez === 'N',
+        extra: {
+          issuer: it.nomeEmissor,
+          subTipo: it.categoria,                 // DEB/CRA/CRI/LF/CDB/NTN-B/LFT/LTN/CDCA
+          issuerType: it.tipoDeAtivo,            // PRIVADO/PUBLICO
+          rating: it.descricaoRatingAgencia,
+          cetipCode: it.codigoCetipSelic,
+          grupoXp: grp,
+        },
       });
     }
   }
 
-  const totalAmount = num(data.patrimonioTotal, data.totalAmount, data.patrimonio, data.equity, data.totalEquity)
-    || assets.reduce((s, a) => s + (a.grossValue ?? 0), 0);
+  // 4. Previdência
+  for (const it of (pd?.previdencia?.itens ?? [])) {
+    assets.push({
+      assetClass: 'PENSION',
+      name: str(it.nomePlano, it.nomeFundo) ?? 'Previdência XP',
+      grossValue: num(it.valorReservaAcumulada),
+      netValue: num(it.valorReservaAcumulada),
+      extra: { cnpj: it.cnpj, subTipo: it.tipoPlano, manager: it.nomeSeguradora, grupoXp: 'previdencia' },
+    });
+  }
+
+  // 5. COE
+  for (const it of (pd?.coe?.itens ?? [])) {
+    assets.push({
+      assetClass: 'OTHER',
+      name: it.nomeAtivo ?? 'COE XP',
+      grossValue: num(it.valorFinanceiroBruto),
+      netValue: num(it.valorFinanceiroLiquido),
+      incomeTax: num(it.valorIr),
+      maturityDate: str(it.dataVencimento),
+      extra: { issuer: it.nomeEmissor, subTipo: 'COE', grupoXp: 'coe' },
+    });
+  }
+
+  // 6. Ações / FII (vazio neste cliente, mas mapeia se vier)
+  for (const it of (pd?.acoes?.itens ?? [])) {
+    assets.push({
+      assetClass: 'EQUITIES',
+      name: str(it.nomeAtivo, it.ticker) ?? 'Ação XP',
+      ticker: str(it.codigoNegociacao, it.ticker),
+      quantity: num(it.quantidadeTotal, it.quantidade),
+      marketPrice: num(it.precoUnitario, it.precoMercado),
+      grossValue: num(it.valorFinanceiroBruto, it.valorBruto, it.valorMercado),
+      netValue: num(it.valorFinanceiroLiquido, it.valorLiquido),
+      extra: { grupoXp: 'acoes' },
+    });
+  }
+
+  // 7. Proventos de RF (a receber) — entra para o total bater com o patrimonioTotal
+  const prov = num(pd?.provisaoEventoRendaFixa?.saldo);
+  if (prov) assets.push({ assetClass: 'OTHER', name: 'Proventos de Renda Fixa', grossValue: prov, netValue: prov, extra: { grupoXp: 'proventos' } });
+
+  const totalAmount = num(pd?.patrimonioTotal) || assets.reduce((s, a) => s + (a.grossValue ?? 0), 0);
 
   return {
     institution: 'XP',
