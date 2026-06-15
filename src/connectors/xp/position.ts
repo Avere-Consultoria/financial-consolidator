@@ -40,8 +40,9 @@ export async function getXpPosition(accountNumber: string): Promise<UnifiedPosit
       }
     );
 
-    const rawItems: any[] = response.data?.value ?? response.data ?? [];
-    return mapXpPosition(rawItems, accountNumber);
+    const data = response.data ?? {};
+    logarEstruturaXP(data);   // estrutura (só nomes de campos, sem valores) p/ ajustar o mapper
+    return mapXpPosition(data, accountNumber);
   } catch (err: any) {
     const status = err?.response?.status;
     const data = err?.response?.data;
@@ -71,41 +72,63 @@ export async function getXpPosition(accountNumber: string): Promise<UnifiedPosit
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Mapper: XP ConsolidatedPosition → UnifiedPosition
+//
+// A resposta é um OBJETO com arrays por classe (acoes, fundos, rendaFixa,
+// tesouroDireto, previdencia, coe, opcoes, ...), não uma lista. Mapeamos cada
+// array conhecido para a assetClass e extraímos valor/nome com fallbacks (os
+// nomes exatos dos campos variam — o logarEstruturaXP ajuda a confirmar).
 // ─────────────────────────────────────────────────────────────────────────────
 
-function mapXpPosition(rawItems: any[], accountNumber: string): UnifiedPosition {
+const XP_ARRAY_CLASSE: Record<string, AssetClass> = {
+  acoes: 'EQUITIES', acoesEListados: 'EQUITIES', rendaVariavel: 'EQUITIES',
+  fundos: 'INVESTMENT_FUND', fundosInvestimento: 'INVESTMENT_FUND',
+  rendaFixa: 'FIXED_INCOME', tesouroDireto: 'FIXED_INCOME',
+  previdencia: 'PENSION',
+  coe: 'OTHER',
+  opcoes: 'DERIVATIVE', termos: 'DERIVATIVE', bmf: 'DERIVATIVE', futuros: 'DERIVATIVE',
+  ouro: 'COMMODITY',
+  alugueis: 'EQUITIES',
+  saldoConta: 'CASH', contaCorrente: 'CASH', caixa: 'CASH',
+};
+
+const num = (...vs: any[]): number => {
+  for (const v of vs) { const n = parseFloat(v); if (!isNaN(n)) return n; }
+  return 0;
+};
+const str = (...vs: any[]): string | undefined => {
+  for (const v of vs) if (v != null && String(v).trim() !== '') return String(v);
+  return undefined;
+};
+
+function mapXpPosition(data: any, accountNumber: string): UnifiedPosition {
   const assets: UnifiedAsset[] = [];
-  let totalAmount = 0;
-  let positionDate = new Date().toISOString();
+  const positionDate = str(data.positionDate, data.dataPosicao, data.referenceDate) ?? new Date().toISOString();
 
-  for (const item of rawItems) {
-    if (item.positionDate) positionDate = item.positionDate;
-
-    const grossValue = parseFloat(item.financialValue ?? item.grossValue ?? item.balance ?? '0');
-    totalAmount += grossValue;
-
-    const assetClass = mapXpAssetClass(item.productType ?? item.assetType ?? '');
-
-    assets.push({
-      assetClass,
-      name: item.productName ?? item.assetName ?? item.description ?? 'Ativo XP',
-      ticker: item.ticker ?? item.symbol,
-      securityCode: item.productCode ?? item.assetCode,
-      quantity: parseFloat(item.quantity ?? item.shares ?? '0'),
-      marketPrice: parseFloat(item.unitPrice ?? item.lastPrice ?? '0'),
-      grossValue,
-      netValue: parseFloat(item.netValue ?? item.financialValue ?? grossValue.toString()),
-      incomeTax: parseFloat(item.incomeTax ?? '0'),
-      maturityDate: item.maturityDate,
-      benchMark: item.indexer ?? item.benchmark,
-      extra: {
-        advisor: item.dimAdvisorCode,
-        office: item.officeCode,
-        productCategory: item.productCategory,
-        productType: item.productType,
-      },
-    });
+  for (const [chave, valor] of Object.entries(data)) {
+    if (!Array.isArray(valor)) continue;
+    const assetClass = XP_ARRAY_CLASSE[chave] ?? 'OTHER';
+    for (const item of valor as any[]) {
+      const grossValue = num(item.grossValue, item.valorBruto, item.financialValue, item.valorMercado,
+                              item.marketValue, item.valorLiquido, item.netValue, item.value, item.amount, item.saldo);
+      assets.push({
+        assetClass,
+        name: str(item.productName, item.nome, item.name, item.ativo, item.descricao, item.ticker, item.symbol) ?? `XP ${chave}`,
+        ticker: str(item.ticker, item.symbol, item.codigo, item.codigoNegociacao),
+        securityCode: str(item.productCode, item.codigoProduto, item.isin),
+        quantity: num(item.quantity, item.quantidade, item.qtd, item.shares),
+        marketPrice: num(item.unitPrice, item.precoUnitario, item.precoMercado, item.lastPrice),
+        grossValue,
+        netValue: num(item.netValue, item.valorLiquido) || grossValue,
+        incomeTax: num(item.incomeTax, item.ir, item.imposto),
+        maturityDate: str(item.maturityDate, item.vencimento, item.dataVencimento),
+        benchMark: str(item.indexer, item.indexador, item.benchmark),
+        extra: { grupoXp: chave },
+      });
+    }
   }
+
+  const totalAmount = num(data.patrimonioTotal, data.totalAmount, data.patrimonio, data.equity, data.totalEquity)
+    || assets.reduce((s, a) => s + (a.grossValue ?? 0), 0);
 
   return {
     institution: 'XP',
@@ -114,11 +137,22 @@ function mapXpPosition(rawItems: any[], accountNumber: string): UnifiedPosition 
     totalAmount,
     currency: 'BRL',
     assets,
-    rawMeta: {
-      source: 'XP Data Access API v1',
-      fetchedAt: new Date().toISOString(),
-    },
+    rawMeta: { source: 'XP Data Access API v1', fetchedAt: new Date().toISOString() },
   };
+}
+
+// Loga só a ESTRUTURA (chaves de topo + nomes de campos do 1º item de cada array),
+// sem valores — para confirmar os nomes reais e afinar o mapper sem vazar PII.
+function logarEstruturaXP(data: any): void {
+  try {
+    const arrays: Record<string, { len: number; campos: string[] }> = {};
+    const topo: string[] = [];
+    for (const [k, v] of Object.entries(data ?? {})) {
+      if (Array.isArray(v)) arrays[k] = { len: v.length, campos: v[0] ? Object.keys(v[0]) : [] };
+      else topo.push(k);
+    }
+    logger.info('XP: estrutura da resposta', { topo, arrays });
+  } catch { /* diagnóstico best-effort */ }
 }
 
 function mapXpAssetClass(productType: string): AssetClass {
