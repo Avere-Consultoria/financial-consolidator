@@ -89,28 +89,29 @@ export async function resolverOuCriarCanonico(
 
   let ativoCanonicoId: string | null = candidatos?.[0]?.ativo_canonico_id ?? null
 
+  // Mapa curado: identificador imutável → classe com certeza.
+  // CNPJ normalizado para 14 dígitos; demais chaves em maiúsculas.
+  const chaves = codigos.map((c) => {
+    const digitos = String(c).replace(/\D/g, '')
+    return digitos.length === 14 ? digitos : String(c).toUpperCase().trim()
+  })
+  const { data: hitMapa } = await supabase
+    .from('mapa_classificacao')
+    .select('classe_avere')
+    .in('chave', chaves)
+    .limit(1)
+  const classeMapa: string | null = hitMapa?.[0]?.classe_avere ?? null
+  const classeFinal = classeMapa ?? sugestao.classe_avere
+  const origemFinal = classeMapa ? 'mapa' : (classeFinal ? 'auto' : null)
+
   // ── 2. Não achou → cria canônico novo ──────────────────────────────────
   if (!ativoCanonicoId) {
-    // Mapa curado primeiro: identificador imutável → classe com certeza.
-    // CNPJ normalizado para 14 dígitos; demais chaves em maiúsculas.
-    const chaves = codigos.map((c) => {
-      const digitos = String(c).replace(/\D/g, '')
-      return digitos.length === 14 ? digitos : String(c).toUpperCase().trim()
-    })
-    const { data: hitMapa } = await supabase
-      .from('mapa_classificacao')
-      .select('classe_avere')
-      .in('chave', chaves)
-      .limit(1)
-    const classeMapa: string | null = hitMapa?.[0]?.classe_avere ?? null
-
-    const classeFinal = classeMapa ?? sugestao.classe_avere
     const { data: novo, error: errCreate } = await supabase
       .from('ativos_canonicos')
       .insert({
         nome_canonico:        sugestao.nome_canonico,
         classe_avere:         classeFinal,
-        origem_classificacao: classeMapa ? 'mapa' : (classeFinal ? 'auto' : null),
+        origem_classificacao: origemFinal,
         liquidez_avere:       sugestao.liquidez_avere,
         data_vencimento:      sugestao.data_vencimento,
         taxa_canonica:        sugestao.taxa_canonica,
@@ -128,18 +129,28 @@ export async function resolverOuCriarCanonico(
       return null
     }
     ativoCanonicoId = novo.id
-  }
-
-  // ── 2b. Enriquece taxa_formatada de canônico EXISTENTE quando esta visão
-  //        traz o cupom (TAXA + CUPOM). Só preenche quando o atual ainda não
-  //        tem cupom — nunca rebaixa um valor já rico. (campo derivado, não
-  //        editado no Master, então é seguro atualizar pelo sync.)
-  if (ativoCanonicoId && sugestao.taxa_formatada && /a\.a\./.test(sugestao.taxa_formatada)) {
-    await supabase
+  } else {
+    // ── 2b. Já existe → AUTO-CURA. Dados derivados da API (subtipo/taxa/
+    //        benchmark/flags) são sempre atualizados (nunca editados à mão).
+    //        A CLASSE só é recomputada quando a origem é 'auto'/vazia — preserva
+    //        o que o Master ajustou ('manual') e o mapa curado ('mapa').
+    const { data: atual } = await supabase
       .from('ativos_canonicos')
-      .update({ taxa_formatada: sugestao.taxa_formatada })
+      .select('origem_classificacao')
       .eq('id', ativoCanonicoId)
-      .or('taxa_formatada.is.null,taxa_formatada.not.ilike.*a.a.*')
+      .maybeSingle()
+    const origemAtual: string | null = atual?.origem_classificacao ?? null
+
+    const patch: Record<string, any> = { is_fii: sugestao.is_fii, is_coe: sugestao.is_coe }
+    if (sugestao.sub_tipo_canonico)  patch.sub_tipo_canonico  = sugestao.sub_tipo_canonico
+    if (sugestao.taxa_canonica)      patch.taxa_canonica      = sugestao.taxa_canonica
+    if (sugestao.taxa_formatada)     patch.taxa_formatada     = sugestao.taxa_formatada
+    if (sugestao.benchmark_canonico) patch.benchmark_canonico = sugestao.benchmark_canonico
+    if (origemAtual === null || origemAtual === 'auto') {
+      patch.classe_avere = classeFinal
+      patch.origem_classificacao = origemFinal
+    }
+    await supabase.from('ativos_canonicos').update(patch).eq('id', ativoCanonicoId)
   }
 
   // ── 3. Garante linha do dicionario_ativos para essa visão institucional ─
