@@ -1,6 +1,6 @@
 import { createServiceClient } from '../_shared/supabaseClient.ts'
 import { corsHeaders, errorResponse, jsonResponse } from '../_shared/cors.ts'
-import { validarAuth, validarOwnershipCliente } from '../_shared/auth.ts'
+import { validarAuth, validarOwnershipCliente, ehChamadaSistema, type AuthContext } from '../_shared/auth.ts'
 import { toDateOnly, todayISO } from '../_shared/dates.ts'
 import { mapTipoLabel, mapSubTipoPadrao } from '../_shared/assetClassMap.ts'
 import { fetchConsolidator, ConsolidatorError } from '../_shared/consolidator.ts'
@@ -22,9 +22,13 @@ Deno.serve(async (req) => {
 
   try {
     // ── Auth ────────────────────────────────────────────────────────────
-    const authResult = await validarAuth(req)
-    if ('error' in authResult) return authResult.error
-    const ctx = authResult.ctx
+    const sistema = await ehChamadaSistema(req)
+    let ctx: AuthContext | null = null
+    if (!sistema) {
+      const authResult = await validarAuth(req)
+      if ('error' in authResult) return authResult.error
+      ctx = authResult.ctx
+    }
 
     const supabase = createServiceClient()
 
@@ -42,8 +46,10 @@ Deno.serve(async (req) => {
     const acc = conta.codigo ?? accountCode
     if (!doc || !acc) return errorResponse('Documento (CPF/CNPJ) e conta da Ágora são obrigatórios', 400)
 
-    const ownerError = await validarOwnershipCliente(ctx, conta.cliente_id)
-    if (ownerError) return ownerError
+    if (!sistema) {
+      const ownerError = await validarOwnershipCliente(ctx!, conta.cliente_id)
+      if (ownerError) return ownerError
+    }
 
     const payload = await fetchConsolidator(`/api/v1/position/agora/${doc}/${acc}`, { method: 'GET' })
     const data = payload?.data || payload

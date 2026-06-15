@@ -75,6 +75,10 @@ export async function validarAuth(req: Request): Promise<
 /**
  * Garante que o usuário é MASTER ou o consultor responsável pelo cliente.
  * Retorna null se autorizado, ou Response de erro 403/404.
+ *
+ * Nota: clientes.consultor_id aponta para consultores.id (o CADASTRO), enquanto
+ * o login é auth.uid() = consultores.perfil_id. Por isso traduzimos o login para
+ * o id do cadastro antes de comparar (mesma semântica do RLS, migration 20260622).
  */
 export async function validarOwnershipCliente(
   ctx: AuthContext,
@@ -93,11 +97,38 @@ export async function validarOwnershipCliente(
     return errorResponse('Cliente não encontrado', 404)
   }
 
-  if (cliente.consultor_id !== ctx.userId) {
+  const { data: consultor } = await supabaseService
+    .from('consultores')
+    .select('id')
+    .eq('perfil_id', ctx.userId)
+    .maybeSingle()
+
+  if (!consultor || cliente.consultor_id !== consultor.id) {
     return errorResponse('Acesso negado: você não é o consultor responsável por este cliente', 403)
   }
 
   return null
+}
+
+/**
+ * Chamada de SISTEMA (cron/orquestrador): autenticada por segredo compartilhado
+ * `x-cron-secret` (env CRON_SECRET), comparado em tempo constante. Quando true,
+ * o caller é confiável e dispensa JWT/ownership — usado pelo sync agendado, que
+ * sincroniza todas as contas sem um usuário logado.
+ */
+export async function ehChamadaSistema(req: Request): Promise<boolean> {
+  const expected = Deno.env.get('CRON_SECRET') ?? ''
+  const provided = req.headers.get('x-cron-secret') ?? ''
+  if (!expected || !provided) return false
+  const enc = new TextEncoder()
+  const [a, b] = await Promise.all([
+    crypto.subtle.digest('SHA-256', enc.encode(provided)),
+    crypto.subtle.digest('SHA-256', enc.encode(expected)),
+  ])
+  const va = new Uint8Array(a), vb = new Uint8Array(b)
+  let diff = 0
+  for (let i = 0; i < va.length; i++) diff |= va[i] ^ vb[i]
+  return diff === 0
 }
 
 /**

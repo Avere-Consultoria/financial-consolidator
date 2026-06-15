@@ -1,7 +1,7 @@
 import { classifyAvere, suggestLiquidezAvere } from '../_shared/classifyAvere.ts'
 import { createServiceClient } from '../_shared/supabaseClient.ts'
 import { corsHeaders, errorResponse, jsonResponse } from '../_shared/cors.ts'
-import { validarAuth, validarOwnershipCliente } from '../_shared/auth.ts'
+import { validarAuth, validarOwnershipCliente, ehChamadaSistema, type AuthContext } from '../_shared/auth.ts'
 import { toDateOnly } from '../_shared/dates.ts'
 import { fetchConsolidator, ConsolidatorError } from '../_shared/consolidator.ts'
 import {
@@ -22,9 +22,13 @@ Deno.serve(async (req) => {
 
   try {
     // ── Auth ────────────────────────────────────────────────────────────
-    const authResult = await validarAuth(req)
-    if ('error' in authResult) return authResult.error
-    const ctx = authResult.ctx
+    const sistema = await ehChamadaSistema(req)
+    let ctx: AuthContext | null = null
+    if (!sistema) {
+      const authResult = await validarAuth(req)
+      if ('error' in authResult) return authResult.error
+      ctx = authResult.ctx
+    }
 
     const supabase = createServiceClient()
 
@@ -38,8 +42,10 @@ Deno.serve(async (req) => {
     if (!conta) return errorResponse('Conta Avenue não encontrada', 404)
     if (!conta.codigo) return errorResponse('Código Avenue não encontrado', 404)
 
-    const ownerError = await validarOwnershipCliente(ctx, conta.cliente_id)
-    if (ownerError) return ownerError
+    if (!sistema) {
+      const ownerError = await validarOwnershipCliente(ctx!, conta.cliente_id)
+      if (ownerError) return ownerError
+    }
 
     // Avenue trabalha com data alvo (custódia fechada — D-4)
     const dateObj = new Date()
