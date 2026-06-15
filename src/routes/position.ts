@@ -9,8 +9,41 @@ import { logger } from '../utils/logger';
 import { getAgoraDetailedPosition } from '../connectors/agora/detailedPosition';
 import { getAvenuePosition } from '../connectors/avenue/position';
 import { parseCpfCnpj } from '../utils/validation';
+import axios from 'axios';
+import { getXpToken, getXpBaseUrl, getXpHttpsAgent } from '../connectors/xp/auth';
 
 const router = Router();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TEMP DEBUG — JSON cru da XP (consolidated-positions). Protegido pelo x-api-key
+// global. Roda do IP fixo do Railway. REMOVER após mapear a estrutura.
+//   GET /api/v1/position/debug/xp-raw/:acc   (header x-api-key)
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/debug/xp-raw/:acc', async (req: Request, res: Response) => {
+  try {
+    const token = await getXpToken();
+    const r = await axios.get(
+      `${getXpBaseUrl()}/data-access/api/v1/consolidated-positions/customer/${req.params.acc}`,
+      {
+        httpsAgent: getXpHttpsAgent(),
+        timeout: 45_000,
+        headers: {
+          'Ocp-Apim-Subscription-Key': process.env.XP_SUBSCRIPTION_KEY,
+          Authorization: `Bearer ${token}`,
+          'User-Agent': 'XPparceiro/AvereConsultoria',
+          Accept: '*/*',
+          'Content-Type': 'application/json',
+        },
+      },
+    );
+    return res.json(r.data);            // JSON cru, sem mapear
+  } catch (e: any) {
+    return res.status(e?.response?.status ?? 500).json({
+      message: e?.message,
+      xpData: e?.response?.data ?? null,
+    });
+  }
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/v1/position/btg/:accountNumber
