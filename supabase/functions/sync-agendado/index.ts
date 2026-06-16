@@ -84,25 +84,30 @@ Deno.serve(async (req) => {
   }
 
   // ── Dispara cada conta em modo sistema (sequencial; respeita rate limit) ────
-  // Orçamento de tempo: a edge function tem teto (~150s). Processa o que couber
-  // dentro de ORCAMENTO_MS e devolve o resto à fila (o próximo tique/clique pega).
-  // Cada chamada tem timeout próprio pra uma conta travada não derrubar o lote.
+  // Orçamento de tempo: a edge function tem teto (~150s). Só inicia uma conta se ela
+  // couber em SAFE_LIMIT_MS contando o timeout dela; o resto fica na fila (o próximo
+  // tique/clique pega). Cada chamada tem timeout próprio (XP maior) pra uma conta
+  // travada não derrubar o lote.
   const baseUrl = Deno.env.get('SUPABASE_URL') ?? ''
   const apikey = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-  const ORCAMENTO_MS = 110_000
-  const TIMEOUT_CONTA_MS = 30_000
+  const SAFE_LIMIT_MS = 140_000      // teto de wall-clock da edge (~150s) com margem
+  const TIMEOUT_CONTA_MS = 30_000    // padrão: BTG/Ágora/Avenue respondem rápido
+  const TIMEOUT_XP_MS = 90_000       // XP é assíncrona: cold-start segura a conexão até ~1 min
   const inicio = Date.now()
   let ok = 0, erro = 0, processados = 0
   const falhas: Array<{ contaId: string; inst: string; msg: string }> = []
 
   for (const c of pendentes) {
-    if (Date.now() - inicio > ORCAMENTO_MS) break   // estoura o orçamento → para; resto fica na fila
     const inst = (c as any).instituicoes?.codigo as string
     const fn = FN[inst]
     if (!fn) { erro++; falhas.push({ contaId: c.id, inst, msg: 'instituição sem function' }); continue }
+    // Timeout por conta (XP precisa de mais no cold-start). Não inicia uma conta que
+    // não caiba no teto da edge → resto fica na fila (próximo tique/clique pega).
+    const timeoutConta = inst === 'XP' ? TIMEOUT_XP_MS : TIMEOUT_CONTA_MS
+    if (Date.now() - inicio + timeoutConta > SAFE_LIMIT_MS) break
     processados++
     const ctrl = new AbortController()
-    const t = setTimeout(() => ctrl.abort(), TIMEOUT_CONTA_MS)
+    const t = setTimeout(() => ctrl.abort(), timeoutConta)
     try {
       const res = await fetch(`${baseUrl}/functions/v1/${fn}`, {
         method: 'POST',
@@ -117,7 +122,7 @@ Deno.serve(async (req) => {
       ok++
     } catch (e) {
       erro++
-      const msg = (e as Error)?.name === 'AbortError' ? `timeout (${TIMEOUT_CONTA_MS / 1000}s)` : ((e as Error)?.message ?? 'erro')
+      const msg = (e as Error)?.name === 'AbortError' ? `timeout (${timeoutConta / 1000}s)` : ((e as Error)?.message ?? 'erro')
       falhas.push({ contaId: c.id, inst, msg })
       await supabase.from('cliente_contas')
         .update({ ultimo_status: 'erro', ultimo_erro: msg }).eq('id', c.id)

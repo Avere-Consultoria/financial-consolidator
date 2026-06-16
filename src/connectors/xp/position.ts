@@ -31,7 +31,9 @@ export async function getXpPosition(accountNumber: string): Promise<UnifiedPosit
       `${baseUrl}/data-access/api/v1/consolidated-positions/customer/${accountNumber}`,
       {
         httpsAgent: agent,
-        timeout: 45_000,
+        // XP é assíncrona: no cold-start ela segura a conexão computando a posição
+        // por até ~1 min antes de responder. 90s dá margem pra completar na 1ª chamada.
+        timeout: 90_000,
         headers: {
           'Ocp-Apim-Subscription-Key': subscriptionKey,
           Authorization: `Bearer ${token}`,

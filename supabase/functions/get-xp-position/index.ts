@@ -60,7 +60,8 @@ Deno.serve(async (req) => {
 
     console.log('Buscando posição XP…')
 
-    const consolidatorJson = await fetchConsolidator(`/api/v1/position/xp/${accountNumber}`)
+    // 90s: a XP no cold-start segura a conexão computando; o default (30s) cortava antes.
+    const consolidatorJson = await fetchConsolidator(`/api/v1/position/xp/${accountNumber}`, { timeoutMs: 90_000 })
     const position = consolidatorJson?.data
     if (!position) return errorResponse('Nenhum dado retornado pelo consolidador XP', 502)
 
