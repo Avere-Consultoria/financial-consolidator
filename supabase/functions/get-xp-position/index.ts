@@ -70,10 +70,25 @@ Deno.serve(async (req) => {
     const dataSincronizacao = new Date().toISOString()
 
     // ── Resolver canônico por ativo, sequencial ──────────────────────────
-    const parsed: ParsedXP[] = []
+    const parsedBruto: ParsedXP[] = []
     for (const asset of assets) {
       const ativoCanonicoId = await resolverCanonicoXP(supabase, asset)
-      parsed.push(parseAtivo(asset, ativoCanonicoId))
+      parsedBruto.push(parseAtivo(asset, ativoCanonicoId))
+    }
+
+    // Dedup defensivo pela MESMA chave do índice único (snapshot_id + nome +
+    // valor_bruto + codigo_ativo + isin). A XP às vezes repete a mesma linha; sem
+    // isto o batch insert INTEIRO falha na constraint e a conta fica com snapshot
+    // mas SEM ativos (patrimônio na rosca, tabela vazia). Recalcula totais no
+    // conjunto já limpo, pra o patrimônio não contar a duplicata.
+    const vistos = new Set<string>()
+    const parsed: ParsedXP[] = []
+    for (const p of parsedBruto) {
+      const d = p.dbRow
+      const chave = `${d.nome}|${d.valor_bruto}|${d.codigo_ativo ?? ''}|${d.isin ?? ''}`
+      if (vistos.has(chave)) continue
+      vistos.add(chave)
+      parsed.push(p)
     }
 
     const totais = calcularTotais(parsed)
@@ -112,8 +127,12 @@ Deno.serve(async (req) => {
         if (parsed.length > 0) {
           const bulk = parsed.map(({ dbRow }) => ({ snapshot_id: snapshot.id, ...dbRow }))
           const { error: insError } = await supabase.from('posicao_xp_ativos').insert(bulk)
-          if (insError) console.error('Erro ao salvar ativos XP:', insError.message)
-          else console.log(`${parsed.length} ativos XP persistidos`)
+          if (insError) {
+            // Não engole: snapshot sem ativos deixa a Home meia-boca silenciosamente.
+            console.error('Erro ao salvar ativos XP:', insError.message)
+            throw new ConsolidatorError(`Falha ao salvar ativos XP: ${insError.message}`, 500)
+          }
+          console.log(`${parsed.length} ativos XP persistidos`)
         }
       }
     } else {

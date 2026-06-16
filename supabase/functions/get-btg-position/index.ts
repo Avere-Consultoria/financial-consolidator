@@ -184,23 +184,35 @@ async function persistirAtivos(
 ) {
   await supabase.from('posicao_btg_ativos').delete().eq('snapshot_id', snapshotId)
 
-  if (parsed.length === 0) return
+  // Dedup defensivo pela MESMA chave do índice único posicao_btg_ativos_unq. Sem
+  // isto, uma linha repetida faz o batch insert INTEIRO falhar e a conta fica com
+  // snapshot mas SEM ativos (patrimônio na rosca, tabela/alocação zeradas).
+  const vistos = new Set<string>()
+  const ativos = parsed.filter(({ dbRow: d }) => {
+    const k = `${d.emissor ?? ''}|${d.isin ?? ''}|${d.ticker ?? ''}|${d.codigo ?? ''}|${d.sub_tipo ?? ''}|${d.maturity_date ?? ''}|${d.valor_bruto}|${d.valor_liquido}`
+    if (vistos.has(k)) return false
+    vistos.add(k)
+    return true
+  })
 
-  const bulkAtivos = parsed.map(({ dbRow }) => ({ snapshot_id: snapshotId, ...dbRow }))
+  if (ativos.length === 0) return
+
+  const bulkAtivos = ativos.map(({ dbRow }) => ({ snapshot_id: snapshotId, ...dbRow }))
   const { data: inseridos, error: ativoError } = await supabase
     .from('posicao_btg_ativos')
     .insert(bulkAtivos)
     .select('id')
 
-  if (ativoError || !inseridos || inseridos.length !== parsed.length) {
+  if (ativoError || !inseridos || inseridos.length !== ativos.length) {
+    // Não engole: snapshot sem ativos deixa a Home meia-boca silenciosamente.
     console.error('Erro ao salvar ativos BTG:', ativoError?.message)
-    return
+    throw new ConsolidatorError(`Falha ao salvar ativos BTG: ${ativoError?.message ?? 'contagem divergente'}`, 500)
   }
 
   const aquisicoesBulk: any[] = []
   const janelasBulk: any[] = []
 
-  parsed.forEach(({ acquisitions, earlyTerminationSchedules }, idx) => {
+  ativos.forEach(({ acquisitions, earlyTerminationSchedules }, idx) => {
     const ativoId = inseridos[idx].id
 
     for (const acq of acquisitions) {
@@ -246,7 +258,7 @@ async function persistirAtivos(
     if (error) console.error('Erro janelas:', error.message)
   }
 
-  console.log(`${parsed.length} ativos BTG persistidos`)
+  console.log(`${ativos.length} ativos BTG persistidos`)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

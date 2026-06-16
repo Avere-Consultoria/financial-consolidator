@@ -62,10 +62,22 @@ Deno.serve(async (req) => {
     console.log(`Processando ${aucData.length} ativos Avenue`)
 
     // Resolver canônico por ativo (sequencial)
-    const parsed = []
+    const parsedBruto = []
     for (const item of aucData) {
       const ativoCanonicoId = await resolverCanonicoAvenue(supabase, item)
-      parsed.push(parseAtivoAvenue(item, ativoCanonicoId))
+      parsedBruto.push(parseAtivoAvenue(item, ativoCanonicoId))
+    }
+
+    // Dedup defensivo pela MESMA chave do índice único posicao_avenue_ativos_unq.
+    // Sem isto, uma linha repetida derruba o batch insert e a conta fica com snapshot
+    // mas SEM ativos. Recalcula totais no conjunto limpo p/ não contar a duplicata.
+    const vistos = new Set<string>()
+    const parsed = []
+    for (const p of parsedBruto) {
+      const d = p.dbRow
+      const k = `${d.nome ?? ''}|${d.isin ?? ''}|${d.cusip ?? ''}|${d.ticker ?? ''}|${d.sub_tipo ?? ''}|${d.maturity_date ?? ''}|${d.valor_bruto_brl}`
+      if (vistos.has(k)) continue
+      vistos.add(k); parsed.push(p)
     }
 
     const totais = calcularTotais(parsed)
@@ -100,7 +112,11 @@ Deno.serve(async (req) => {
     if (parsed.length > 0) {
       const bulkAtivos = parsed.map(({ dbRow }) => ({ snapshot_id: snapshot.id, ...dbRow }))
       const { error: insError } = await supabase.from('posicao_avenue_ativos').insert(bulkAtivos)
-      if (insError) console.error('Erro ao salvar ativos Avenue:', insError.message)
+      if (insError) {
+        // Não engole: snapshot sem ativos deixa a Home meia-boca silenciosamente.
+        console.error('Erro ao salvar ativos Avenue:', insError.message)
+        throw new ConsolidatorError(`Falha ao salvar ativos Avenue: ${insError.message}`, 500)
+      }
     }
 
     await marcarSync(supabase, conta.id, 'ok')

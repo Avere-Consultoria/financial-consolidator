@@ -122,18 +122,32 @@ Deno.serve(async (req) => {
         liquidez_diaria:     a.isLiquidity ?? false,
       }))
 
+      // Dedup defensivo pela MESMA chave do índice único posicao_agora_ativos_unq,
+      // mantendo `assets` alinhado p/ as aquisições. Sem isto, uma linha repetida
+      // derruba o batch inteiro e a conta fica com snapshot mas SEM ativos.
+      const vistos = new Set<string>()
+      const ativosU: any[] = []
+      const assetsU: UnifiedAsset[] = []
+      ativos.forEach((r, idx) => {
+        const k = `${r.emissor ?? ''}|${r.security_code ?? ''}|${r.ticker ?? ''}|${r.sub_tipo ?? ''}|${r.data_vencimento ?? ''}|${r.valor_bruto}|${r.valor_liquido}`
+        if (vistos.has(k)) return
+        vistos.add(k); ativosU.push(r); assetsU.push(assets[idx])
+      })
+
       await supabase.from('posicao_agora_ativos').delete().eq('snapshot_id', snapshot.id)
       const { data: inseridos, error: ativosError } = await supabase
         .from('posicao_agora_ativos')
-        .insert(ativos)
+        .insert(ativosU)
         .select('id')
 
-      if (ativosError || !inseridos || inseridos.length !== assets.length) {
+      if (ativosError || !inseridos || inseridos.length !== ativosU.length) {
+        // Não engole: snapshot sem ativos deixa a Home meia-boca silenciosamente.
         console.error('Erro ativos Ágora:', ativosError?.message)
+        throw new ConsolidatorError(`Falha ao salvar ativos Ágora: ${ativosError?.message ?? 'contagem divergente'}`, 500)
       } else {
         // ── Aquisições (histórico) para TD e Fundos ──────────────────────
         const aquisicoes: any[] = []
-        assets.forEach((a, idx) => {
+        assetsU.forEach((a, idx) => {
           const ativoId = inseridos[idx].id
           const acqs = a.extra?.acquisitions ?? []
           if (!Array.isArray(acqs) || acqs.length === 0) return
