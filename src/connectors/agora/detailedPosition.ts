@@ -435,6 +435,21 @@ export async function getDetailedPension(cpfCnpj: string): Promise<UnifiedAsset[
   }
 }
 
+// Último dia útil (D-1, pulando fim de semana). Feriados não tratados — aproximação
+// p/ a data de referência da custódia Bradesco quando a API não a expõe.
+function ultimoDiaUtilISO(): string {
+  const d = new Date();
+  do { d.setDate(d.getDate() - 1); } while (d.getDay() === 0 || d.getDay() === 6);
+  return d.toISOString().slice(0, 10);
+}
+
+// Parse defensivo do referenceDate da Ágora (formato incerto) → 'YYYY-MM-DD' ou null.
+function parseRefDateAgora(v: any): string | null {
+  if (v == null || v === '') return null;
+  const t = new Date(String(v));
+  return isNaN(t.getTime()) ? null : t.toISOString().slice(0, 10);
+}
+
 // ─── Posição completa — busca todas as classes e consolida ───────────────────
 
 export async function getAgoraDetailedPosition(
@@ -472,10 +487,19 @@ export async function getAgoraDetailedPosition(
 
   const totalAmount = assets.reduce((sum, a) => sum + (a.grossValue ?? 0), 0);
 
+  // Data real da posição: a Ágora não expõe uma data de posição confiável (os
+  // campos de data são do ATIVO). Usa o referenceDate dos itens se vier parseável;
+  // senão, último dia útil (custódia Bradesco liquida em D-1). Nunca carimba hoje.
+  const refs = assets
+    .map(a => parseRefDateAgora((a.extra as any)?.referenceDate))
+    .filter((d): d is string => !!d)
+    .sort();
+  const positionDate = refs.length ? refs[refs.length - 1] : ultimoDiaUtilISO();
+
   return {
     institution: 'AGORA',
     accountNumber: accountCode,
-    positionDate: new Date().toISOString(),
+    positionDate,
     totalAmount,
     currency: 'BRL',
     assets,

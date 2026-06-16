@@ -9,14 +9,20 @@ import { maskDoc, maskUrl } from '../../utils/mask';
 export async function getAvenuePosition(accountNumber: string): Promise<UnifiedPosition> {
   logger.info(`Buscando posições da Avenue para CPF/Código: ${maskDoc(accountNumber)}`);
 
-  const dateObj = new Date();
-  dateObj.setDate(dateObj.getDate() - 4);
-  const targetDate = dateObj.toISOString().split('T')[0];
-
   try {
-    const data = await getAvenueAuc(targetDate, accountNumber);
+    // A AUC da Avenue serve D-1 (comprovado). Tenta D-1 e recua até achar um dia
+    // ÚTIL com dado (fim de semana/feriado vêm vazios). targetDate = data REAL.
+    let data: any[] = [];
+    let targetDate = '';
+    for (let back = 1; back <= 5; back++) {
+      const d = new Date();
+      d.setDate(d.getDate() - back);
+      targetDate = d.toISOString().split('T')[0];
+      data = await getAvenueAuc(targetDate, accountNumber);
+      if (Array.isArray(data) && data.length > 0) break;
+    }
 
-    logger.info(`Sucesso ao buscar Avenue. Encontrados ${data.length} ativos.`);
+    logger.info(`Sucesso ao buscar Avenue (ref ${targetDate}). Encontrados ${data?.length ?? 0} ativos.`);
 
     return mapAvenueToUnifiedPosition(accountNumber, data, targetDate);
   } catch (error: any) {
