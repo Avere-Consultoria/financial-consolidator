@@ -46,6 +46,86 @@ router.get('/debug/xp-raw/:acc', async (req: Request, res: Response) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// TEMP DEBUG — endpoints ESTÁTICOS da XP (sem cold-start), p/ avaliar troca.
+// Todos protegidos pelo x-api-key global e rodando do IP fixo do Railway.
+// JSON cru, sem mapear. REMOVER após decidir a migração.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const XP_HEADERS = (token: string) => ({
+  'Ocp-Apim-Subscription-Key': process.env.XP_SUBSCRIPTION_KEY,
+  Authorization: `Bearer ${token}`,
+  'User-Agent': 'XPparceiro/AvereConsultoria',
+  Accept: '*/*',
+  'Content-Type': 'application/json',
+});
+const ymd = (d: Date) => d.toISOString().slice(0, 10);
+const XP_V2_PRODUCT_TYPES = ['Coe', 'Treasury', 'Cash', 'Stock', 'TradedFunds', 'Repo', 'FixedIncome', 'PensionFunds', 'Fund'];
+
+// Posição V2 (ESTÁTICA, D-3) por conta. Mesmo modelo por-conta do atual, sem recálculo.
+//   GET /api/v1/position/debug/xp-v2/:acc?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
+router.get('/debug/xp-v2/:acc', async (req: Request, res: Response) => {
+  try {
+    const hoje = new Date();
+    const endDate   = (req.query.endDate   as string) || ymd(hoje);
+    const startDate = (req.query.startDate as string) || ymd(new Date(hoje.getTime() - 7 * 86_400_000));
+    const qs = new URLSearchParams({ startDate, endDate });
+    for (const pt of XP_V2_PRODUCT_TYPES) qs.append('productTypes', pt);
+
+    const token = await getXpToken();
+    const r = await axios.get(
+      `${getXpBaseUrl()}/data-access/api/v2/positions/customers/${req.params.acc}?${qs.toString()}`,
+      { httpsAgent: getXpHttpsAgent(), timeout: 45_000, headers: XP_HEADERS(token) },
+    );
+    return res.json(r.data);
+  } catch (e: any) {
+    return res.status(e?.response?.status ?? 500).json({ message: e?.message, xpData: e?.response?.data ?? null });
+  }
+});
+
+// Custódia / AUC (D-1, LOTE: todas as contas do escritório de uma vez). Star-schema OData.
+//   GET /api/v1/position/debug/xp-auc?date=YYYY-MM-DD&top=10000
+router.get('/debug/xp-auc', async (req: Request, res: Response) => {
+  try {
+    const dia  = (req.query.date as string) || ymd(new Date(Date.now() - 86_400_000)); // D-1
+    const prox = ymd(new Date(new Date(`${dia}T00:00:00Z`).getTime() + 86_400_000));
+    const qs = new URLSearchParams({
+      $filter: `(dimTimeCode ge ${dia}T00:00:00Z and dimTimeCode lt ${prox}T00:00:00Z)`,
+      $top: (req.query.top as string) || '10000',
+    });
+
+    const token = await getXpToken();
+    const r = await axios.get(
+      `${getXpBaseUrl()}/data-access/api/v1/auc?${qs.toString()}`,
+      { httpsAgent: getXpHttpsAgent(), timeout: 60_000, headers: XP_HEADERS(token) },
+    );
+    return res.json(r.data);
+  } catch (e: any) {
+    return res.status(e?.response?.status ?? 500).json({ message: e?.message, xpData: e?.response?.data ?? null });
+  }
+});
+
+// Positivador (D-1, LOTE, nível CLASSE/comercial — net por classe, captação, suitability).
+//   GET /api/v1/position/debug/xp-positivador?positionDate=YYYY-MM-DD&top=10000
+router.get('/debug/xp-positivador', async (req: Request, res: Response) => {
+  try {
+    const positionDate = (req.query.positionDate as string) || ymd(new Date(Date.now() - 86_400_000));
+    const qs = new URLSearchParams({
+      $filter: `positionDate eq ${positionDate}T00:00:00Z`,
+      $top: (req.query.top as string) || '10000',
+    });
+
+    const token = await getXpToken();
+    const r = await axios.get(
+      `${getXpBaseUrl()}/data-access/api/v1/positivador?${qs.toString()}`,
+      { httpsAgent: getXpHttpsAgent(), timeout: 60_000, headers: XP_HEADERS(token) },
+    );
+    return res.json(r.data);
+  } catch (e: any) {
+    return res.status(e?.response?.status ?? 500).json({ message: e?.message, xpData: e?.response?.data ?? null });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // GET /api/v1/position/btg/:accountNumber
 // Posição de uma conta no BTG Pactual
 // ─────────────────────────────────────────────────────────────────────────────
