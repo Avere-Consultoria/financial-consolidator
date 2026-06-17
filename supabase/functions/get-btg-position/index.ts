@@ -2,7 +2,7 @@ import { classifyAvere, suggestLiquidezAvere } from '../_shared/classifyAvere.ts
 import { createServiceClient } from '../_shared/supabaseClient.ts'
 import { corsHeaders, errorResponse, jsonResponse } from '../_shared/cors.ts'
 import { validarAuth, validarOwnershipCliente, ehChamadaSistema, type AuthContext } from '../_shared/auth.ts'
-import { toDateOnly, todayISO } from '../_shared/dates.ts'
+import { toDateOnly, ontemISO } from '../_shared/dates.ts'
 import { mapTipoLabel, mapSubTipoPadrao } from '../_shared/assetClassMap.ts'
 import { fetchConsolidator, ConsolidatorError } from '../_shared/consolidator.ts'
 import {
@@ -65,8 +65,9 @@ Deno.serve(async (req) => {
 
     const assets: UnifiedAsset[] = position.assets ?? []
 
-    // Datas: positionDate vem da API (data REAL da foto); sincronização é now()
-    const dataReferencia    = toDateOnly(position.positionDate) ?? todayISO()
+    // BTG é D0 e rotula a ABERTURA do dia consultado (PositionDate = dia da chamada),
+    // cujos valores são o fechamento do dia anterior. Data canônica = sync − 1 (ontem).
+    const dataReferencia    = ontemISO()
     const dataSincronizacao = new Date().toISOString()
 
     const totais   = calcularTotais(assets)

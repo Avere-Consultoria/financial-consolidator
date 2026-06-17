@@ -1,7 +1,7 @@
 import { createServiceClient } from '../_shared/supabaseClient.ts'
 import { corsHeaders, errorResponse, jsonResponse } from '../_shared/cors.ts'
 import { validarAuth, validarOwnershipCliente, ehChamadaSistema, type AuthContext } from '../_shared/auth.ts'
-import { toDateOnly, todayISO } from '../_shared/dates.ts'
+import { toDateOnly, ontemISO } from '../_shared/dates.ts'
 import { mapTipoLabel, mapSubTipoPadrao } from '../_shared/assetClassMap.ts'
 import { fetchConsolidator, ConsolidatorError } from '../_shared/consolidator.ts'
 import {
@@ -58,9 +58,10 @@ Deno.serve(async (req) => {
 
     const assets: UnifiedAsset[] = data.assets ?? []
 
-    // Ágora: connector usa now() como positionDate (API não retorna data real).
-    // Fica para revisão futura — quando o connector evoluir, vai funcionar automaticamente.
-    const dataReferencia    = toDateOnly(data.positionDate) ?? todayISO()
+    // Ágora é D0, construída na hora (confirmado com o suporte) e não devolve data
+    // de referência. Num sync de madrugada, representa o fechamento de ontem.
+    // Data canônica = sync − 1 (ontem).
+    const dataReferencia    = ontemISO()
     const dataSincronizacao = new Date().toISOString()
 
     // Resolver canônico por ativo

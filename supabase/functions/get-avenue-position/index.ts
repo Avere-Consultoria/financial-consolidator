@@ -47,19 +47,31 @@ Deno.serve(async (req) => {
       if (ownerError) return ownerError
     }
 
-    // Avenue trabalha com data alvo (custódia fechada — D-4)
-    const dateObj = new Date()
-    dateObj.setDate(dateObj.getDate() - 4)
-    const targetDate = dateObj.toISOString().split('T')[0]
+    // Avenue atrasa ~2 dias úteis (pipeline analítico Looker). Trava em D-2 (BRT) com
+    // rede: se vier vazio, recua até achar dado e carimba a data REAL encontrada —
+    // nunca rotula uma data mais nova do que a Avenue de fato tem (evitaria divergência).
     const dataSincronizacao = new Date().toISOString()
+    const brtAgora = new Date(Date.now() - 3 * 60 * 60 * 1000)
+    let targetDate = ''
+    let aucData: any[] = []
+    for (let i = 2; i <= 6; i++) {
+      const d = new Date(brtAgora)
+      d.setUTCDate(d.getUTCDate() - i)
+      const tentativa = d.toISOString().split('T')[0]
+      const rawJson = await fetchConsolidator(
+        `/api/v1/avenue/auc?date=${tentativa}&cpf=${conta.codigo}`,
+        { method: 'GET' }
+      )
+      const rows: any[] = Array.isArray(rawJson?.data) ? rawJson.data : []
+      if (rows.length > 0) { targetDate = tentativa; aucData = rows; break }
+    }
+    if (!targetDate) {
+      // Sem dado em D-2..D-6: carimba D-2 vazio (não quebra o consolidado).
+      const d = new Date(brtAgora); d.setUTCDate(d.getUTCDate() - 2)
+      targetDate = d.toISOString().split('T')[0]
+    }
 
-    const rawJson = await fetchConsolidator(
-      `/api/v1/avenue/auc?date=${targetDate}&cpf=${conta.codigo}`,
-      { method: 'GET' }
-    )
-    const aucData: any[] = Array.isArray(rawJson?.data) ? rawJson.data : []
-
-    console.log(`Processando ${aucData.length} ativos Avenue`)
+    console.log(`Processando ${aucData.length} ativos Avenue (ref ${targetDate})`)
 
     // Resolver canônico por ativo (sequencial)
     const parsedBruto = []

@@ -62,3 +62,13 @@ export function toDateOnly(input: string | number | Date | null | undefined): st
 export function todayISO(): string {
   return new Date().toISOString().split('T')[0]
 }
+
+/** "Ontem" no fuso de Brasília (UTC-3), em "YYYY-MM-DD".
+ *  As fontes D0 (BTG/XP/Ágora) são construídas na hora da chamada; num sync de
+ *  madrugada, a posição que elas entregam é o FECHAMENTO do dia anterior. Por isso
+ *  a data de referência canônica é sempre "ontem" (sync − 1 dia, calendário). */
+export function ontemISO(): string {
+  const brt = new Date(Date.now() - 3 * 60 * 60 * 1000)
+  brt.setUTCDate(brt.getUTCDate() - 1)
+  return brt.toISOString().split('T')[0]
+}
