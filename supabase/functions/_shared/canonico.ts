@@ -225,6 +225,7 @@ export function sugerirCanonicoComClassificacao(
     benchMark:    asset.benchMark    ?? asset.extra?.bondRate ?? null,
     indexRate:    asset.indexRate    ?? null,
     bondType:     asset.extra?.bondType ?? null,
+    subTipo:      asset.extra?.subTipo ?? null,   // XP entrega o tipo do título em extra.subTipo (LFT/NTN-B/CDB…)
     name:         asset.name         ?? null,
     isFII:        isFiiApi,
     productType:  asset.extra?.productType ?? null,

@@ -74,6 +74,9 @@ export function classifyAvere(p: ClassifyInput): ClasseAvere | null {
     return 'Internacional - Renda Variável'
   }
 
+  // COE pode chegar como DERIVATIVE (BTG) ou OTHER (XP) — o rótulo (subtipo/nome) decide.
+  if (bondType.includes('COE') || /\bCOE\b/.test(name)) return 'COE'
+
   // ── Doméstico (BTG / Ágora / XP) ──────────────────────────────────────────
   if (assetClass === 'CASH')      return 'Conta Corrente'
   if (assetClass === 'CRYPTO')    return 'Alternativos'
@@ -120,7 +123,11 @@ export function classifyAvere(p: ClassifyInput): ClasseAvere | null {
     if (/\bLTN\b|NTN-F/.test(bondType))              return 'RF - Prefixado'
     if (/\bLFT\b/.test(bondType))                    return 'RF - Pós-fixado'
 
-    // Sem indexador identificável → não chutamos mais Pós-fixado
+    // Taxa fixa pura, sem indexador (a XP manda "+13,50%" em CDB/LCI/LCA/CRA/CDCA
+    // PREFIXADOS). Uma taxa nominal isolada (sem CDI/IPCA/SELIC) é renda fixa prefixada.
+    if (/^\+?\s*\d+([.,]\d+)?\s*%$/.test(bench))      return 'RF - Prefixado'
+
+    // Sem indexador nem taxa identificável → revisão
     return null
   }
 
