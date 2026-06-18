@@ -89,20 +89,29 @@ export async function resolverOuCriarCanonico(
 
   let ativoCanonicoId: string | null = candidatos?.[0]?.ativo_canonico_id ?? null
 
-  // Mapa curado: identificador imutável → classe com certeza.
+  // Biblioteca rica: identificador imutável → dados-base curados (vencem o derivado).
   // CNPJ normalizado para 14 dígitos; demais chaves em maiúsculas.
   const chaves = codigos.map((c) => {
     const digitos = String(c).replace(/\D/g, '')
     return digitos.length === 14 ? digitos : String(c).toUpperCase().trim()
   })
-  const { data: hitMapa } = await supabase
-    .from('mapa_classificacao')
-    .select('classe_avere')
+  const { data: hitBib } = await supabase
+    .from('biblioteca_ativos')
+    .select('classe_avere, benchmark, liquidez, taxa_formatada, sub_tipo')
     .in('chave', chaves)
     .limit(1)
-  const classeMapa: string | null = hitMapa?.[0]?.classe_avere ?? null
-  const classeFinal = classeMapa ?? sugestao.classe_avere
-  const origemFinal = classeMapa ? 'mapa' : (classeFinal ? 'auto' : null)
+  const bib = hitBib?.[0] ?? null
+
+  // Precedência campo a campo: biblioteca curada > derivado da API.
+  // A classe define a origem; o 'manual' do Master é preservado na auto-cura.
+  const classeBib: string | null = bib?.classe_avere ?? null
+  const classeFinal    = classeBib ?? sugestao.classe_avere
+  const origemFinal    = classeBib ? 'biblioteca' : (classeFinal ? 'auto' : null)
+  const benchmarkFinal = bib?.benchmark      ?? sugestao.benchmark_canonico
+  const liquidezFinal  = bib?.liquidez       ?? sugestao.liquidez_avere
+  const taxaFmtFinal   = bib?.taxa_formatada ?? sugestao.taxa_formatada
+  const taxaCanonFinal = bib?.taxa_formatada ?? sugestao.taxa_canonica
+  const subTipoFinal   = bib?.sub_tipo       ?? sugestao.sub_tipo_canonico
 
   // ── 2. Não achou → cria canônico novo ──────────────────────────────────
   if (!ativoCanonicoId) {
@@ -112,12 +121,12 @@ export async function resolverOuCriarCanonico(
         nome_canonico:        sugestao.nome_canonico,
         classe_avere:         classeFinal,
         origem_classificacao: origemFinal,
-        liquidez_avere:       sugestao.liquidez_avere,
+        liquidez_avere:       liquidezFinal,
         data_vencimento:      sugestao.data_vencimento,
-        taxa_canonica:        sugestao.taxa_canonica,
-        taxa_formatada:       sugestao.taxa_formatada,
-        benchmark_canonico:   sugestao.benchmark_canonico,
-        sub_tipo_canonico:    sugestao.sub_tipo_canonico,
+        taxa_canonica:        taxaCanonFinal,
+        taxa_formatada:       taxaFmtFinal,
+        benchmark_canonico:   benchmarkFinal,
+        sub_tipo_canonico:    subTipoFinal,
         is_fii:               sugestao.is_fii,
         is_coe:               sugestao.is_coe,
       })
@@ -130,23 +139,28 @@ export async function resolverOuCriarCanonico(
     }
     ativoCanonicoId = novo.id
   } else {
-    // ── 2b. Já existe → AUTO-CURA. Dados derivados da API (subtipo/taxa/
-    //        benchmark/flags) são sempre atualizados (nunca editados à mão).
-    //        A CLASSE só é recomputada quando a origem é 'auto'/vazia — preserva
-    //        o que o Master ajustou ('manual') e o mapa curado ('mapa').
+    // ── 2b. Já existe → AUTO-CURA. Reaplica a referência atual (biblioteca > API)
+    //        em todos os campos-base. A CLASSE só NÃO é tocada quando a origem é
+    //        'manual' (Master fixou à mão); 'biblioteca'/'mapa'/'auto'/null recomputam.
     const { data: atual } = await supabase
       .from('ativos_canonicos')
-      .select('origem_classificacao')
+      .select('origem_classificacao, liquidez_avere')
       .eq('id', ativoCanonicoId)
       .maybeSingle()
     const origemAtual: string | null = atual?.origem_classificacao ?? null
 
     const patch: Record<string, any> = { is_fii: sugestao.is_fii, is_coe: sugestao.is_coe }
-    if (sugestao.sub_tipo_canonico)  patch.sub_tipo_canonico  = sugestao.sub_tipo_canonico
-    if (sugestao.taxa_canonica)      patch.taxa_canonica      = sugestao.taxa_canonica
-    if (sugestao.taxa_formatada)     patch.taxa_formatada     = sugestao.taxa_formatada
-    if (sugestao.benchmark_canonico) patch.benchmark_canonico = sugestao.benchmark_canonico
-    if (origemAtual === null || origemAtual === 'auto') {
+    if (subTipoFinal)   patch.sub_tipo_canonico  = subTipoFinal
+    if (taxaCanonFinal) patch.taxa_canonica      = taxaCanonFinal
+    if (taxaFmtFinal)   patch.taxa_formatada     = taxaFmtFinal
+    if (benchmarkFinal) patch.benchmark_canonico = benchmarkFinal
+    // Liquidez: preenche só quando está VAZIA — não sobrescreve o que o Master ajustou.
+    if ((atual?.liquidez_avere == null || atual?.liquidez_avere === '')
+        && liquidezFinal != null && liquidezFinal !== '')
+      patch.liquidez_avere = liquidezFinal
+    // Base (classe etc.) recomputa sempre, EXCETO quando o Master fixou à mão ('manual').
+    // Inclui 'mapa'/'biblioteca'/'auto'/null → reaplica a referência atual (idempotente).
+    if (origemAtual !== 'manual') {
       patch.classe_avere = classeFinal
       patch.origem_classificacao = origemFinal
     }

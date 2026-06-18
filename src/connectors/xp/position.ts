@@ -193,17 +193,46 @@ function mapXpPosition(data: any, accountNumber: string): UnifiedPosition {
     });
   }
 
-  // 6. Ações / FII (vazio neste cliente, mas mapeia se vier)
+  // 6. Ações — a XP usa codigoAtivo/nomeEmpresaEmitente/valorAtual/precoUnitarioAtual.
+  // Ações dentro de estruturada vêm com valorAtual 0 (some no filtro de zero, sem duplicar).
   for (const it of (pd?.acoes?.itens ?? [])) {
     assets.push({
       assetClass: 'EQUITIES',
-      name: str(it.nomeAtivo, it.ticker) ?? 'Ação XP',
-      ticker: str(it.codigoNegociacao, it.ticker),
-      quantity: num(it.quantidadeTotal, it.quantidade),
-      marketPrice: num(it.precoUnitario, it.precoMercado),
-      grossValue: num(it.valorFinanceiroBruto, it.valorBruto, it.valorMercado),
-      netValue: num(it.valorFinanceiroLiquido, it.valorLiquido),
+      name: str(it.nomeEmpresaEmitente, it.codigoAtivo) ?? 'Ação XP',
+      ticker: str(it.codigoAtivo),
+      quantity: num(it.quantidadeTotalAbertura, it.quantidadeAbertura),
+      marketPrice: num(it.precoUnitarioAtual),
+      grossValue: num(it.valorAtual),
+      netValue: num(it.valorAtual),
       extra: { grupoXp: 'acoes' },
+    });
+  }
+
+  // 6.1 Fundos Imobiliários (FII/FIAgro listados) — seção própria na XP, mesma forma das ações.
+  for (const it of (pd?.fundosImobiliarios?.itens ?? [])) {
+    assets.push({
+      assetClass: 'EQUITIES',
+      name: str(it.nomeEmpresaEmitente, it.codigoAtivo) ?? 'FII XP',
+      ticker: str(it.codigoAtivo),
+      quantity: num(it.quantidadeTotalAtual, it.quantidadeAbertura),
+      marketPrice: num(it.precoUnitarioAtual),
+      grossValue: num(it.valorAtual),
+      netValue: num(it.valorAtual),
+      extra: { grupoXp: 'fundosImobiliarios', isFii: true },
+    });
+  }
+
+  // 6.5. Produtos Estruturados (COLLAR, etc.) — cada estrutura = 1 ativo (valor = saldo).
+  // A ação-base vem com saldo 0 em `acoes` e some no filtro de zero (não duplica).
+  for (const it of (pd?.produtosEstruturados?.itens ?? [])) {
+    assets.push({
+      assetClass: 'OTHER',
+      name: str(it.nomeEstrutura, it.tipoEstrutura) ?? 'Estruturada',
+      ticker: str(it.ativo),
+      grossValue: num(it.saldo, it.custo),
+      netValue: num(it.saldoLiquido, it.saldo, it.custo),
+      maturityDate: str(it.dataEncerramento),
+      extra: { subTipo: 'ESTRUTURADA', issuer: it.tipoEstrutura, grupoXp: 'estruturados' },
     });
   }
 

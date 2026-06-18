@@ -261,6 +261,7 @@ function parseAtivo(a: UnifiedAsset, ativoCanonicoId: string | null): ParsedXP {
     valor_imposto_renda: a.incomeTax ?? null,
     benchmark:           a.benchMark || null,
     indexador:           a.benchMark || null,
+    rentabilidade:       a.indexRate || null,   // taxaCompleta ("IPC-A +3,51%") — a Home formata daqui
     data_vencimento:     toDateOnly(a.maturityDate),
     is_liquidity:        a.isLiquidity ?? false,
     is_isento_ir:        a.extra?.taxFree ?? false,

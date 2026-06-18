@@ -10,7 +10,10 @@ import { getAgoraDetailedPosition } from '../connectors/agora/detailedPosition';
 import { getAvenuePosition } from '../connectors/avenue/position';
 import { parseCpfCnpj } from '../utils/validation';
 import axios from 'axios';
+import { v4 as uuidv4 } from 'uuid';
 import { getXpToken, getXpBaseUrl, getXpHttpsAgent } from '../connectors/xp/auth';
+import { getBtgToken } from '../connectors/btg/auth';
+import { getAgoraBaseUrl, getAgoraHeaders, getAgoraHttpsAgent } from '../connectors/agora/auth';
 
 const router = Router();
 
@@ -42,6 +45,40 @@ router.get('/debug/xp-raw/:acc', async (req: Request, res: Response) => {
       message: e?.message,
       xpData: e?.response?.data ?? null,
     });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TEMP DEBUG — JSON cru de BTG e Ágora (mTLS pelo cert do Consolidador, IP fixo).
+// Postman puro dá 401 "SSL with client authentication is required"; aqui o cert
+// é apresentado pelo Railway. Protegido pelo x-api-key global. REMOVER no go-live.
+//   GET /api/v1/position/debug/btg-raw/:acc                  → posição BTG inteira (crua)
+//   GET /api/v1/position/debug/agora-raw/:cpf/:acc?path=...  → Ágora cru (default RF)
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/debug/btg-raw/:acc', async (req: Request, res: Response) => {
+  try {
+    const token = await getBtgToken();
+    const base = process.env.BTG_POSITION_BASE_URL ?? 'https://api.btgpactual.com/iaas-api-position';
+    const r = await axios.get(`${base}/api/v1/position/${req.params.acc}`, {
+      headers: { access_token: token, 'x-id-partner-request': uuidv4() },
+      timeout: 45_000,
+    });
+    return res.json(r.data);            // cru, todas as classes (incl. FixedIncome)
+  } catch (e: any) {
+    return res.status(e?.response?.status ?? 500).json({ message: e?.message, data: e?.response?.data ?? null });
+  }
+});
+
+router.get('/debug/agora-raw/:cpf/:acc', async (req: Request, res: Response) => {
+  try {
+    // ?path= p/ outras classes: detailedposition/fixedIncome (default), consolidatedposition/funds, /coe, /equities…
+    const sub = String(req.query.path ?? 'detailedposition/fixedIncome').replace(/^\/+/, '');
+    const url = `${getAgoraBaseUrl()}/managers-position-mgmt/v1/${sub}/${req.params.cpf}/${req.params.acc}`;
+    const headers = await getAgoraHeaders();
+    const r = await axios.get(url, { headers, httpsAgent: getAgoraHttpsAgent(), timeout: 45_000 });
+    return res.json(r.data);            // cru, sem mapear
+  } catch (e: any) {
+    return res.status(e?.response?.status ?? 500).json({ message: e?.message, data: e?.response?.data ?? null });
   }
 });
 

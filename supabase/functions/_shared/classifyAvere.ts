@@ -31,6 +31,7 @@ export type ClasseAvere =
   | 'FII-FIAgro'
   | 'Renda Variável'
   | 'COE'
+  | 'Estruturada'
   | 'Alternativos'
   | 'Internacional - Pós-fixado'
   | 'Internacional - RF Inflação'
@@ -76,6 +77,10 @@ export function classifyAvere(p: ClassifyInput): ClasseAvere | null {
 
   // COE pode chegar como DERIVATIVE (BTG) ou OTHER (XP) — o rótulo (subtipo/nome) decide.
   if (bondType.includes('COE') || /\bCOE\b/.test(name)) return 'COE'
+
+  // Produto Estruturado (COLLAR, etc.) — a XP entrega em produtosEstruturados; o
+  // conector mapeia como OTHER com subtipo ESTRUTURADA.
+  if (bondType.includes('ESTRUTURAD')) return 'Estruturada'
 
   // ── Doméstico (BTG / Ágora / XP) ──────────────────────────────────────────
   if (assetClass === 'CASH')      return 'Conta Corrente'
@@ -123,9 +128,11 @@ export function classifyAvere(p: ClassifyInput): ClasseAvere | null {
     if (/\bLTN\b|NTN-F/.test(bondType))              return 'RF - Prefixado'
     if (/\bLFT\b/.test(bondType))                    return 'RF - Pós-fixado'
 
-    // Taxa fixa pura, sem indexador (a XP manda "+13,50%" em CDB/LCI/LCA/CRA/CDCA
-    // PREFIXADOS). Uma taxa nominal isolada (sem CDI/IPCA/SELIC) é renda fixa prefixada.
-    if (/^\+?\s*\d+([.,]\d+)?\s*%$/.test(bench))      return 'RF - Prefixado'
+    // Taxa fixa pura, sem indexador → prefixado. Cobre os dois formatos:
+    //   XP    → "+13,50%"          (vírgula, prefixo +)
+    //   Ágora → "14.0% a.a."       (ponto, sufixo "a.a."/"ao ano")
+    // Uma taxa nominal isolada (sem CDI/IPCA/SELIC/TR/dólar) é renda fixa prefixada.
+    if (/^\+?\s*\d+([.,]\d+)?\s*%(\s*a\.?\s*a\.?|\s*ao\s*ano)?$/i.test(bench)) return 'RF - Prefixado'
 
     // Sem indexador nem taxa identificável → revisão
     return null
