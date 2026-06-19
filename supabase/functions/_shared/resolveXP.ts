@@ -42,7 +42,7 @@ export function resolverSubTipoXP(a: UnifiedAsset): string {
   if (type.includes('debenture') || type.includes('debênture'))   return 'DEB'
   if (type.includes('tesouro'))                                   return 'TD'
   if (type.includes('fii'))                                       return 'FII'
-  if (type.includes('fundo') || type.includes('fund'))            return 'FI'
+  if (type.includes('fundo') || type.includes('fund'))            return 'FUNDO'
   return mapSubTipoPadrao(a.assetClass)
 }
 

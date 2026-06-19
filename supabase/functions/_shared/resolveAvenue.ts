@@ -28,19 +28,18 @@ export function classificarProductType(type: string): string {
   return 'OTHER'
 }
 
-// productType da Avenue (inglês) → subtipo padronizado p/ o canônico.
-// Não mapeado → cai no normalizarSubTipo (preserva o original, visível p/ mapear depois).
+// productType da Avenue (inglês) → subtipo do PADRÃO do sistema.
+// Só mapeia o que tem token oficial (CAIXA/FUNDO/ETF/AÇÃO). Sem token padrão
+// (Options, Bonds internacionais, Crypto…) → passthrough cru → cai em "Classificar"
+// no Master (decisão: não inventar subtipo fora do vocabulário).
 export function subTipoAvenue(productType: string | null | undefined): string | null {
   const t = (productType || '').trim()
   if (!t) return null
   if (t.includes('Balance') || t.includes('Banking') || t.includes('Clearing')) return 'CAIXA'
-  if (t.includes('Bonds'))  return 'BOND'
-  if (t.includes('Funds'))  return 'FUNDO'
-  if (t.includes('Option')) return 'OPÇÃO'
+  if (t.includes('Funds')) return 'FUNDO'
   if (t.includes('ETF') || t.includes('UCIT')) return 'ETF'
   if (t.includes('Stocks')) return 'AÇÃO'
-  if (t.includes('Crypto')) return 'CRIPTO'
-  return normalizarSubTipo(t)
+  return normalizarSubTipo(t)   // Options/Bonds/Crypto/etc. → cru, p/ o Master classificar
 }
 
 export function mapTipoLabelAvenue(assetClass: string): string {

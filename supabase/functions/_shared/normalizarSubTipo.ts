@@ -74,6 +74,10 @@ const MAPA: Record<string, string> = {
   'OPERACAO COMPROMISSADA':                   'COMPROMISSADA',
   'OPERAÇÃO COMPROMISSADA':                   'COMPROMISSADA',
   'COMPROMISSADA':                            'COMPROMISSADA',
+
+  // ── Fundos: token padrão do sistema é FUNDO (FI é alias legado) ────────────
+  'FI':                                       'FUNDO',
+  'FUNDO':                                    'FUNDO',
 }
 
 /**
