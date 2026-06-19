@@ -73,7 +73,7 @@ function mapBtgPosition(raw: any, accountNumber: string): UnifiedPosition {
       incomeTax: parseFloat(item.IncomeTax ?? '0'),
       maturityDate: item.MaturityDate,
       benchMark: item.ReferenceIndexName,
-      indexRate: item.ReferenceIndexValue,
+      indexRate: item.IndexYieldRate ?? item.ReferenceIndexValue,   // taxa completa ("IPCA + 6,71%")
       isLiquidity: item.IsLiquidity === 'true',
       extra: {
         raw: item,                                  // cru genérico → biblioteca/dicionario

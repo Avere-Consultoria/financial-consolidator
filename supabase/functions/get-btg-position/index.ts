@@ -146,10 +146,13 @@ async function resolverCanonicoBTG(supabase: any, a: UnifiedAsset): Promise<stri
 
   const subTipoNormalizado = normalizarSubTipo(parsearTicker(a.ticker ?? '', a.assetClass).subTipo)
 
+  const override: Record<string, any> = { sub_tipo_canonico: subTipoNormalizado }
+  if (a.indexRate) { override.taxa_canonica = a.indexRate; override.taxa_formatada = a.indexRate }
+
   return await resolverOuCriarCanonico(
     supabase,
     lookup,
-    sugerirCanonicoComClassificacao(a, 'BTG', { sub_tipo_canonico: subTipoNormalizado }),
+    sugerirCanonicoComClassificacao(a, 'BTG', override),
     {
       instituicao_origem:      'BTG',
       identificador_principal: principal,
