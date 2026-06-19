@@ -114,7 +114,9 @@ export async function resolverOuCriarCanonico(
   const liquidezFinal  = bib?.liquidez       ?? sugestao.liquidez_avere
   const taxaFmtFinal   = bib?.taxa_formatada ?? sugestao.taxa_formatada
   const taxaCanonFinal = bib?.taxa_formatada ?? sugestao.taxa_canonica
-  const subTipoFinal   = bib?.sub_tipo       ?? sugestao.sub_tipo_canonico
+  // Normaliza o subtipo da biblioteca também — um valor legado (ex.: 'FI') vira o
+  // token padrão ('FUNDO') no reprocesso, sem precisar truncar a biblioteca.
+  const subTipoFinal   = normalizarSubTipo(bib?.sub_tipo) ?? sugestao.sub_tipo_canonico
 
   // ── 2. Não achou → cria canônico novo ──────────────────────────────────
   if (!ativoCanonicoId) {

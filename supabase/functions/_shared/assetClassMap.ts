@@ -16,7 +16,7 @@ const TIPO_LABEL: Record<string, string> = {
 }
 
 const SUBTIPO_PADRAO: Record<string, string> = {
-  INVESTMENT_FUND: 'FI',
+  INVESTMENT_FUND: 'FUNDO',
   EQUITIES:        'AÇÃO',
   PENSION:         'PREV',
   CRYPTO:          'CRYPTO',
