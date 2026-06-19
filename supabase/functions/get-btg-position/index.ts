@@ -4,6 +4,7 @@ import { corsHeaders, errorResponse, jsonResponse } from '../_shared/cors.ts'
 import { validarAuth, validarOwnershipCliente, ehChamadaSistema, type AuthContext } from '../_shared/auth.ts'
 import { toDateOnly, ontemISO } from '../_shared/dates.ts'
 import { extrairDetalhes } from '../_shared/detalhes.ts'
+import { normalizarIndexador } from '../_shared/indexador.ts'
 import { mapTipoLabel, mapSubTipoPadrao } from '../_shared/assetClassMap.ts'
 import { fetchConsolidator, ConsolidatorError } from '../_shared/consolidator.ts'
 import {
@@ -146,8 +147,9 @@ async function resolverCanonicoBTG(supabase: any, a: UnifiedAsset): Promise<stri
 
   const subTipoNormalizado = normalizarSubTipo(parsearTicker(a.ticker ?? '', a.assetClass).subTipo)
 
+  const indexRate = normalizarIndexador(a.indexRate)
   const override: Record<string, any> = { sub_tipo_canonico: subTipoNormalizado }
-  if (a.indexRate) { override.taxa_canonica = a.indexRate; override.taxa_formatada = a.indexRate }
+  if (indexRate) { override.taxa_canonica = indexRate; override.taxa_formatada = indexRate }
 
   return await resolverOuCriarCanonico(
     supabase,
@@ -279,7 +281,7 @@ function parseAtivo(a: UnifiedAsset, ativoCanonicoId: string | null) {
   const subTipo        = normalizarSubTipo(subTipoRaw) ?? subTipoRaw
   const emissor        = issuer || a.name || ''
   const tipoLabel      = mapTipoLabel(a.assetClass)
-  const rentabilidade  = formatRentabilidade(a)
+  const rentabilidade  = normalizarIndexador(formatRentabilidade(a))
   const issueDate      = toDateOnly(a.extra?.issueDate)
   const maturityDate   = toDateOnly(a.maturityDate)
 
@@ -314,7 +316,7 @@ function parseAtivo(a: UnifiedAsset, ativoCanonicoId: string | null) {
     quantidade:          a.quantity ?? null,
     preco_mercado:       a.marketPrice ?? null,
     rentabilidade,
-    benchmark:           a.benchMark ?? null,
+    benchmark:           normalizarIndexador(a.benchMark),
     yield_avg:           a.extra?.yieldAvg ?? null,
     fund_manager:        a.extra?.manager ?? null,
     fund_cnpj:           a.extra?.cnpj ?? null,
@@ -335,7 +337,7 @@ function parseAtivo(a: UnifiedAsset, ativoCanonicoId: string | null) {
     quantidade:    a.quantity ?? null,
     precoMercado:  a.marketPrice ?? null,
     rentabilidade,
-    benchmark:     a.benchMark ?? null,
+    benchmark:     normalizarIndexador(a.benchMark),
     vencimento:    a.maturityDate ?? null,
     extra: {
       isin:            a.extra?.isin ?? null,
