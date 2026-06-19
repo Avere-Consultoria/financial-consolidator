@@ -178,7 +178,7 @@ export function mapXpPosition(data: any, accountNumber: string): UnifiedPosition
       name: str(it.nomePlano, it.nomeFundo) ?? 'Previdência XP',
       grossValue: num(it.valorReservaAcumulada),
       netValue: num(it.valorReservaAcumulada),
-      extra: { cnpj: it.cnpj, subTipo: it.tipoPlano, manager: it.nomeSeguradora, grupoXp: 'previdencia' },
+      extra: { cnpj: it.cnpj, subTipo: it.tipoPlano, manager: it.nomeSeguradora, grupoXp: 'previdencia', raw: it },
     });
   }
 

@@ -19,6 +19,13 @@ import { extrairDetalhes } from './detalhes.ts'
 import type { UnifiedAsset } from './types.ts'
 
 export function coletarIdentificadoresXP(a: UnifiedAsset): Identificador[] {
+  // Previdência: o CNPJ do fundo é COMPARTILHADO entre planos (VGBL e PGBL do mesmo
+  // fundo). O CNPJ puro faria os dois colidirem no MESMO canônico (nome de um, plano
+  // de outro). Chaveia por CNPJ + tipo de plano p/ separá-los.
+  if (a.assetClass === 'PENSION' && a.extra?.cnpj) {
+    const plano = a.extra?.subTipo ? String(a.extra.subTipo).toUpperCase().trim() : ''
+    return [{ tipo: 'TICKER', codigo: plano ? `${a.extra.cnpj}-${plano}` : String(a.extra.cnpj) }]
+  }
   const ids: Identificador[] = []
   if (a.extra?.isin)   ids.push({ tipo: 'ISIN',   codigo: a.extra.isin })
   if (a.extra?.cnpj)   ids.push({ tipo: 'CNPJ',   codigo: a.extra.cnpj })
