@@ -303,36 +303,38 @@ function mapPension(items: any[]): UnifiedAsset[] {
   });
 }
 
-// ─── Funções públicas por classe de ativo ────────────────────────────────────
+// ─── Fetchers de RAW por classe (sem mapear) ─────────────────────────────────
+// Buscam o cru de cada endpoint da Ágora. Usados tanto pela posição viva quanto
+// pelo arquivo (posicao_raw) → o bundle cru é o que permite o replay sem corretora.
 
-export async function getDetailedEquities(cpfCnpj: string, accountCode: string): Promise<UnifiedAsset[]> {
+async function fetchRawEquities(cpfCnpj: string, accountCode: string): Promise<any[]> {
   try {
     logger.info(`Ágora: buscando ações para conta ${accountCode}`);
     const data = await agoraGet(`/consolidatedposition/equities/${cpfCnpj}/${accountCode}`);
-    return mapEquities(extractArray(data, 'consolidatedPosition', 'positions', 'equities'));
+    return extractArray(data, 'consolidatedPosition', 'positions', 'equities');
   } catch (err: any) {
     throw new ConsolidatorError('AGORA_EQUITIES_ERROR', `Erro ao buscar ações: ${err?.response?.data?.message ?? err.message}`, 'AGORA', err?.response?.status ?? 502);
   }
 }
 
-export async function getDetailedFixedIncome(cpfCnpj: string, accountCode: string): Promise<UnifiedAsset[]> {
+async function fetchRawFixedIncome(cpfCnpj: string, accountCode: string): Promise<any[]> {
   try {
     logger.info(`Ágora: buscando renda fixa para conta ${accountCode}`);
     const data = await agoraGet(`/detailedposition/fixedIncome/${cpfCnpj}/${accountCode}`);
-    return mapFixedIncome(extractArray(data, 'fixedIncomes', 'fixedIncome', 'bonds'));
+    return extractArray(data, 'fixedIncomes', 'fixedIncome', 'bonds');
   } catch (err: any) {
     throw new ConsolidatorError('AGORA_FIXED_INCOME_ERROR', `Erro ao buscar renda fixa: ${err?.response?.data?.message ?? err.message}`, 'AGORA', err?.response?.status ?? 502);
   }
 }
 
-export async function getDetailedTreasuryDirect(cpfCnpj: string, accountCode: string): Promise<UnifiedAsset[]> {
+async function fetchRawTreasuryDirect(cpfCnpj: string, accountCode: string): Promise<any[]> {
   try {
     logger.info(`Ágora: buscando tesouro direto para conta ${accountCode}`);
     const data = await agoraGet(`/consolidatedposition/treasuryDirect/${cpfCnpj}/${accountCode}`);
     const items = extractArray(data, 'treasuryDirect', 'treasuryDirects', 'bonds');
 
     // Enriquece cada TD com o histórico de aplicações via /detailedposition/treasuryDirect
-    const enriched = await Promise.all(items.map(async (item) => {
+    return await Promise.all(items.map(async (item) => {
       if (!item.bondType || !item.maturityDate) return { ...item, _acquisitions: [] };
       try {
         const detail = await agoraGet(
@@ -345,21 +347,19 @@ export async function getDetailedTreasuryDirect(cpfCnpj: string, accountCode: st
         return { ...item, _acquisitions: [] };
       }
     }));
-
-    return mapTreasuryDirect(enriched);
   } catch (err: any) {
     throw new ConsolidatorError('AGORA_TREASURY_ERROR', `Erro ao buscar tesouro direto: ${err?.response?.data?.message ?? err.message}`, 'AGORA', err?.response?.status ?? 502);
   }
 }
 
-export async function getDetailedFunds(cpfCnpj: string, accountCode: string): Promise<UnifiedAsset[]> {
+async function fetchRawFunds(cpfCnpj: string, accountCode: string): Promise<any[]> {
   try {
     logger.info(`Ágora: buscando fundos para conta ${accountCode}`);
     const data = await agoraGet(`/consolidatedposition/funds/${cpfCnpj}/${accountCode}`);
     const items = extractArray(data, 'funds', 'investmentFunds');
 
     // Enriquece cada fundo com o histórico de aplicações via /detailedposition/funds
-    const enriched = await Promise.all(items.map(async (item) => {
+    return await Promise.all(items.map(async (item) => {
       if (item.sourceCode == null) return { ...item, _acquisitions: [] };
       try {
         const detail = await agoraGet(
@@ -372,67 +372,99 @@ export async function getDetailedFunds(cpfCnpj: string, accountCode: string): Pr
         return { ...item, _acquisitions: [] };
       }
     }));
-
-    return mapFunds(enriched);
   } catch (err: any) {
     throw new ConsolidatorError('AGORA_FUNDS_ERROR', `Erro ao buscar fundos: ${err?.response?.data?.message ?? err.message}`, 'AGORA', err?.response?.status ?? 502);
   }
 }
 
-export async function getDetailedCoe(cpfCnpj: string, accountCode: string): Promise<UnifiedAsset[]> {
+async function fetchRawCoe(cpfCnpj: string, accountCode: string): Promise<any[]> {
   try {
     const data = await agoraGet(`/consolidatedposition/coe/${cpfCnpj}/${accountCode}`);
-    return mapCoe(extractArray(data, 'coe', 'coes'));
+    return extractArray(data, 'coe', 'coes');
   } catch (err: any) {
     throw new ConsolidatorError('AGORA_COE_ERROR', `Erro ao buscar COE: ${err?.response?.data?.message ?? err.message}`, 'AGORA', err?.response?.status ?? 502);
   }
 }
 
-export async function getDetailedOptions(cpfCnpj: string, accountCode: string): Promise<UnifiedAsset[]> {
+async function fetchRawOptions(cpfCnpj: string, accountCode: string): Promise<any[]> {
   try {
     const data = await agoraGet(`/consolidatedposition/option/${cpfCnpj}/${accountCode}`);
-    return mapOptions(extractArray(data, 'options', 'option'));
+    return extractArray(data, 'options', 'option');
   } catch (err: any) {
     throw new ConsolidatorError('AGORA_OPTIONS_ERROR', `Erro ao buscar opções: ${err?.response?.data?.message ?? err.message}`, 'AGORA', err?.response?.status ?? 502);
   }
 }
 
-export async function getDetailedFutures(cpfCnpj: string, accountCode: string): Promise<UnifiedAsset[]> {
+async function fetchRawFutures(cpfCnpj: string, accountCode: string): Promise<any[]> {
   try {
     const data = await agoraGet(`/consolidatedposition/futures/${cpfCnpj}/${accountCode}`);
-    return mapFutures(extractArray(data, 'futures', 'future'));
+    return extractArray(data, 'futures', 'future');
   } catch (err: any) {
     throw new ConsolidatorError('AGORA_FUTURES_ERROR', `Erro ao buscar futuros: ${err?.response?.data?.message ?? err.message}`, 'AGORA', err?.response?.status ?? 502);
   }
 }
 
-export async function getDetailedBtc(cpfCnpj: string, accountCode: string): Promise<UnifiedAsset[]> {
+async function fetchRawBtc(cpfCnpj: string, accountCode: string): Promise<any[]> {
   try {
     const data = await agoraGet(`/consolidatedposition/btc/${cpfCnpj}/${accountCode}`);
-    return mapBtc(extractArray(data, 'btc', 'btcPositions'));
+    return extractArray(data, 'btc', 'btcPositions');
   } catch (err: any) {
     throw new ConsolidatorError('AGORA_BTC_ERROR', `Erro ao buscar BTC/aluguel: ${err?.response?.data?.message ?? err.message}`, 'AGORA', err?.response?.status ?? 502);
   }
 }
 
-export async function getDetailedTerm(cpfCnpj: string, accountCode: string): Promise<UnifiedAsset[]> {
+async function fetchRawTerm(cpfCnpj: string, accountCode: string): Promise<any[]> {
   try {
     const data = await agoraGet(`/consolidatedposition/term/${cpfCnpj}/${accountCode}`);
-    return mapTerm(extractArray(data, 'term', 'terms'));
+    return extractArray(data, 'term', 'terms');
   } catch (err: any) {
     throw new ConsolidatorError('AGORA_TERM_ERROR', `Erro ao buscar termo: ${err?.response?.data?.message ?? err.message}`, 'AGORA', err?.response?.status ?? 502);
   }
 }
 
 // Previdência: endpoint diferente — só CPF, sem accountCode
-export async function getDetailedPension(cpfCnpj: string): Promise<UnifiedAsset[]> {
+async function fetchRawPension(cpfCnpj: string): Promise<any[]> {
   try {
     logger.info(`Ágora: buscando previdência para CPF ${maskDoc(cpfCnpj)}`);
     const data = await agoraGet(`/consolidatedposition/pension/${cpfCnpj}`);
-    return mapPension(extractArray(data, 'proposals', 'pension', 'plans'));
+    return extractArray(data, 'proposals', 'pension', 'plans');
   } catch (err: any) {
     throw new ConsolidatorError('AGORA_PENSION_ERROR', `Erro ao buscar previdência: ${err?.response?.data?.message ?? err.message}`, 'AGORA', err?.response?.status ?? 502);
   }
+}
+
+// Bundle de raw por classe (multi-call) — é o que arquivamos em posicao_raw e o
+// que o /transform recebe para re-mapear sem nova chamada à Ágora.
+export interface AgoraRawBundle {
+  equities: any[]; fixedIncome: any[]; treasuryDirect: any[]; funds: any[]; coe: any[];
+  options: any[]; futures: any[]; btc: any[]; term: any[]; pension: any[];
+}
+
+async function fetchAgoraBundle(cpfCnpj: string, accountCode: string): Promise<{ bundle: AgoraRawBundle; errors: string[] }> {
+  const tarefas: [keyof AgoraRawBundle, () => Promise<any[]>][] = [
+    ['equities',       () => fetchRawEquities(cpfCnpj, accountCode)],
+    ['fixedIncome',    () => fetchRawFixedIncome(cpfCnpj, accountCode)],
+    ['treasuryDirect', () => fetchRawTreasuryDirect(cpfCnpj, accountCode)],
+    ['funds',          () => fetchRawFunds(cpfCnpj, accountCode)],
+    ['coe',            () => fetchRawCoe(cpfCnpj, accountCode)],
+    ['options',        () => fetchRawOptions(cpfCnpj, accountCode)],
+    ['futures',        () => fetchRawFutures(cpfCnpj, accountCode)],
+    ['btc',            () => fetchRawBtc(cpfCnpj, accountCode)],
+    ['term',           () => fetchRawTerm(cpfCnpj, accountCode)],
+    ['pension',        () => fetchRawPension(cpfCnpj)],
+  ];
+  const results = await Promise.allSettled(tarefas.map(([, fn]) => fn()));
+  const bundle = {
+    equities: [], fixedIncome: [], treasuryDirect: [], funds: [], coe: [],
+    options: [], futures: [], btc: [], term: [], pension: [],
+  } as AgoraRawBundle;
+  const errors: string[] = [];
+  results.forEach((r, i) => {
+    const key = tarefas[i][0];
+    if (r.status === 'fulfilled') bundle[key] = r.value;
+    else { errors.push(key); logger.warn(`Ágora: falha ao buscar ${key}`, { reason: (r.reason as any)?.message }); }
+  });
+  return { bundle, errors };
 }
 
 // Último dia útil (D-1, pulando fim de semana). Feriados não tratados — aproximação
@@ -450,40 +482,21 @@ function parseRefDateAgora(v: any): string | null {
   return isNaN(t.getTime()) ? null : t.toISOString().slice(0, 10);
 }
 
-// ─── Posição completa — busca todas as classes e consolida ───────────────────
-
-export async function getAgoraDetailedPosition(
-  cpfCnpj: string,
-  accountCode: string
-): Promise<UnifiedPosition> {
-  logger.info(`Ágora: buscando posição detalhada completa para conta ${accountCode}`);
-
-  // Busca em paralelo, tolerando falhas individuais por classe
-  const results = await Promise.allSettled([
-    getDetailedEquities(cpfCnpj, accountCode),
-    getDetailedFixedIncome(cpfCnpj, accountCode),
-    getDetailedTreasuryDirect(cpfCnpj, accountCode),
-    getDetailedFunds(cpfCnpj, accountCode),
-    getDetailedCoe(cpfCnpj, accountCode),
-    getDetailedOptions(cpfCnpj, accountCode),
-    getDetailedFutures(cpfCnpj, accountCode),
-    getDetailedBtc(cpfCnpj, accountCode),
-    getDetailedTerm(cpfCnpj, accountCode),
-    getDetailedPension(cpfCnpj),             // só CPF — sem accountCode
-  ]);
-
-  const assets: UnifiedAsset[] = [];
-  const errors: string[] = [];
-
-  results.forEach((result, i) => {
-    const labels = ['equities','fixedIncome','treasuryDirect','funds','coe','options','futures','btc','term','pension'];
-    if (result.status === 'fulfilled') {
-      assets.push(...result.value);
-    } else {
-      logger.warn(`Ágora: falha ao buscar ${labels[i]}`, { reason: result.reason?.message });
-      errors.push(labels[i]);
-    }
-  });
+// ─── Mapeia um bundle de raw → UnifiedPosition (puro, sem I/O) ────────────────
+// Usado pela posição viva e pelo /transform (replay do raw arquivado, sem corretora).
+export function mapAgoraBundle(bundle: AgoraRawBundle, accountCode: string): UnifiedPosition {
+  const assets: UnifiedAsset[] = [
+    ...mapEquities(bundle?.equities ?? []),
+    ...mapFixedIncome(bundle?.fixedIncome ?? []),
+    ...mapTreasuryDirect(bundle?.treasuryDirect ?? []),
+    ...mapFunds(bundle?.funds ?? []),
+    ...mapCoe(bundle?.coe ?? []),
+    ...mapOptions(bundle?.options ?? []),
+    ...mapFutures(bundle?.futures ?? []),
+    ...mapBtc(bundle?.btc ?? []),
+    ...mapTerm(bundle?.term ?? []),
+    ...mapPension(bundle?.pension ?? []),
+  ];
 
   const totalAmount = assets.reduce((sum, a) => sum + (a.grossValue ?? 0), 0);
 
@@ -503,10 +516,20 @@ export async function getAgoraDetailedPosition(
     totalAmount,
     currency: 'BRL',
     assets,
-    rawMeta: {
-      source: 'agora/detailedposition',
-      fetchedAt: new Date().toISOString(),
-      ...(errors.length > 0 && { partialErrors: errors } as any),
-    },
+    rawMeta: { source: 'agora/detailedposition', fetchedAt: new Date().toISOString() },
   };
+}
+
+// ─── Posição completa — busca todas as classes (raw bundle) e consolida ──────
+export async function getAgoraDetailedPosition(
+  cpfCnpj: string,
+  accountCode: string
+): Promise<UnifiedPosition> {
+  logger.info(`Ágora: buscando posição detalhada completa para conta ${accountCode}`);
+
+  const { bundle, errors } = await fetchAgoraBundle(cpfCnpj, accountCode);
+  const pos = mapAgoraBundle(bundle, accountCode);
+  if (errors.length > 0) (pos.rawMeta as any).partialErrors = errors;
+  pos.rawPayload = bundle;        // arquivo cru → posicao_raw → replay via /transform
+  return pos;
 }

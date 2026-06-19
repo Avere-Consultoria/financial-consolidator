@@ -56,7 +56,7 @@ export async function getBtgPosition(accountNumber: string): Promise<UnifiedPosi
 // Mapper: BTG PositionData → UnifiedPosition
 // ─────────────────────────────────────────────────────────────────────────────
 
-function mapBtgPosition(raw: any, accountNumber: string): UnifiedPosition {
+export function mapBtgPosition(raw: any, accountNumber: string): UnifiedPosition {
   const assets: UnifiedAsset[] = [];
 
   // ── Renda Fixa ──────────────────────────────────────────────────────────────
@@ -353,5 +353,6 @@ function mapBtgPosition(raw: any, accountNumber: string): UnifiedPosition {
       source: 'BTG IaaS API v1',
       fetchedAt: new Date().toISOString(),
     },
+    rawPayload: raw,
   };
 }

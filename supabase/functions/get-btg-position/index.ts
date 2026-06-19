@@ -3,15 +3,10 @@ import { createServiceClient } from '../_shared/supabaseClient.ts'
 import { corsHeaders, errorResponse, jsonResponse } from '../_shared/cors.ts'
 import { validarAuth, validarOwnershipCliente, ehChamadaSistema, type AuthContext } from '../_shared/auth.ts'
 import { toDateOnly, ontemISO } from '../_shared/dates.ts'
-import { extrairDetalhes } from '../_shared/detalhes.ts'
 import { normalizarIndexador, padronizarTaxa } from '../_shared/indexador.ts'
-import { mapTipoLabel, mapSubTipoPadrao } from '../_shared/assetClassMap.ts'
+import { mapTipoLabel } from '../_shared/assetClassMap.ts'
 import { fetchConsolidator, ConsolidatorError } from '../_shared/consolidator.ts'
-import {
-  resolverOuCriarCanonico,
-  sugerirCanonicoComClassificacao,
-  type Identificador,
-} from '../_shared/canonico.ts'
+import { resolverCanonicoBTG, parsearTicker } from '../_shared/resolveBTG.ts'
 import { normalizarSubTipo } from '../_shared/normalizarSubTipo.ts'
 import { resolverContaPorId, resolverContaPorCodigo, marcarSync } from '../_shared/contas.ts'
 import type { UnifiedAsset } from '../_shared/types.ts'
@@ -71,6 +66,18 @@ Deno.serve(async (req) => {
     // cujos valores são o fechamento do dia anterior. Data canônica = sync − 1 (ontem).
     const dataReferencia    = ontemISO()
     const dataSincronizacao = new Date().toISOString()
+
+    // Arquiva o payload CRU completo (posicao_raw) → reprocesso sem nova chamada à corretora.
+    if (conta.cliente_id && position.rawPayload != null) {
+      const { error: rawErr } = await supabase.from('posicao_raw').upsert({
+        cliente_id:      conta.cliente_id,
+        conta_id:        conta.id,
+        instituicao:     'BTG',
+        data_referencia: dataReferencia,
+        payload:         position.rawPayload,
+      }, { onConflict: 'conta_id,instituicao,data_referencia' })
+      if (rawErr) console.error('Erro ao arquivar posicao_raw BTG:', rawErr.message)
+    }
 
     const totais   = calcularTotais(assets)
     const alocacao = [
@@ -134,53 +141,6 @@ Deno.serve(async (req) => {
     return errorResponse('Erro interno', 500)
   }
 })
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Resolução de canônico (BTG)
-// Prioridade: ISIN > CETIP (como ISIN) > CNPJ > TICKER > security_code (como TICKER)
-// ─────────────────────────────────────────────────────────────────────────────
-
-async function resolverCanonicoBTG(supabase: any, a: UnifiedAsset): Promise<string | null> {
-  const lookup: Identificador[] = coletarIdentificadoresBTG(a)
-  const principal = lookup[0]
-  if (!principal) return null
-
-  const subTipoNormalizado = normalizarSubTipo(parsearTicker(a.ticker ?? '', a.assetClass).subTipo)
-
-  const indexRate = padronizarTaxa(a.indexRate)
-  const override: Record<string, any> = { sub_tipo_canonico: subTipoNormalizado }
-  if (indexRate) { override.taxa_canonica = indexRate; override.taxa_formatada = indexRate }
-
-  return await resolverOuCriarCanonico(
-    supabase,
-    lookup,
-    sugerirCanonicoComClassificacao(a, 'BTG', override),
-    {
-      instituicao_origem:      'BTG',
-      identificador_principal: principal,
-      nome_ativo:              a.name || '',
-      emissor_original:        a.extra?.issuer ?? null,
-      classe_original:         mapTipoLabel(a.assetClass),
-      liquidez_api_original:   a.extra?.fundLiquidity != null && a.extra?.fundLiquidity !== ''
-                                 ? String(a.extra.fundLiquidity)
-                                 : (a.isLiquidity ? '0' : null),
-      vencimento_api_original: toDateOnly(a.maturityDate),
-      index_rate:              a.indexRate ?? null,
-    },
-    a.extra?.raw ?? null,
-    extrairDetalhes('BTG', subTipoNormalizado, a.extra?.raw),
-  )
-}
-
-function coletarIdentificadoresBTG(a: UnifiedAsset): Identificador[] {
-  const ids: Identificador[] = []
-  if (a.extra?.isin)        ids.push({ tipo: 'ISIN',   codigo: a.extra.isin })
-  if (a.extra?.cetipCode)   ids.push({ tipo: 'ISIN',   codigo: a.extra.cetipCode })
-  if (a.extra?.cnpj)        ids.push({ tipo: 'CNPJ',   codigo: a.extra.cnpj })
-  if (a.ticker)             ids.push({ tipo: 'TICKER', codigo: a.ticker })
-  if (a.securityCode)       ids.push({ tipo: 'TICKER', codigo: a.securityCode })
-  return ids
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Persistência dos ativos (bulk)
@@ -390,13 +350,6 @@ function calcularTotais(assets: UnifiedAsset[]) {
     }
   }
   return t
-}
-
-function parsearTicker(ticker: string, assetClass: string): { subTipo: string; codigo: string } {
-  if (!ticker) return { subTipo: mapSubTipoPadrao(assetClass), codigo: '' }
-  const match = ticker.match(/^([A-Z]+)-(.+)$/)
-  if (match) return { subTipo: match[1], codigo: match[2] }
-  return { subTipo: ticker, codigo: '' }
 }
 
 function formatRentabilidade(a: UnifiedAsset): string | null {

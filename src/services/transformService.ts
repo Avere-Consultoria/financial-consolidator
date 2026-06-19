@@ -1,4 +1,7 @@
 import { mapXpPosition } from '../connectors/xp/position';
+import { mapBtgPosition } from '../connectors/btg/position';
+import { mapAgoraBundle } from '../connectors/agora/detailedPosition';
+import { mapAvenueToUnifiedPosition } from '../connectors/avenue/mapper';
 import { UnifiedPosition, Institution, ConsolidatorError } from '../types';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -9,6 +12,13 @@ import { UnifiedPosition, Institution, ConsolidatorError } from '../types';
 // guardado e chama /transform, que devolve o UnifiedPosition re-mapeado com a
 // lógica ATUAL do connector. Assim, conserto de mapeamento se reaplica ao que já
 // entrou, sem gastar a janela de chamada (ex.: XP).
+//
+// Cada instituição tem um shape de payload próprio:
+//   XP/BTG → resposta inteira da API.
+//   AGORA  → bundle { equities, fixedIncome, treasuryDirect, funds, ... } (multi-call).
+//   AVENUE → { items, targetDate } (o mapper precisa da data de referência).
+// (AVENUE também é reprocessável item-a-item direto na edge; o /transform existe
+//  por completude/diagnóstico.)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function transformPayload(
@@ -19,7 +29,12 @@ export function transformPayload(
   switch (institution) {
     case 'XP':
       return mapXpPosition(payload, accountNumber);
-    // BTG / AGORA / AVENUE: habilitar conforme os mappers forem exportados.
+    case 'BTG':
+      return mapBtgPosition(payload, accountNumber);
+    case 'AGORA':
+      return mapAgoraBundle(payload, accountNumber);
+    case 'AVENUE':
+      return mapAvenueToUnifiedPosition(accountNumber, payload?.items ?? [], payload?.targetDate ?? '');
     default:
       throw new ConsolidatorError(
         'TRANSFORM_UNSUPPORTED',

@@ -2,15 +2,10 @@ import { createServiceClient } from '../_shared/supabaseClient.ts'
 import { corsHeaders, errorResponse, jsonResponse } from '../_shared/cors.ts'
 import { validarAuth, validarOwnershipCliente, ehChamadaSistema, type AuthContext } from '../_shared/auth.ts'
 import { toDateOnly, ontemISO } from '../_shared/dates.ts'
-import { extrairDetalhes } from '../_shared/detalhes.ts'
-import { normalizarIndexador, padronizarTaxa } from '../_shared/indexador.ts'
-import { mapTipoLabel, mapSubTipoPadrao } from '../_shared/assetClassMap.ts'
+import { padronizarTaxa } from '../_shared/indexador.ts'
+import { mapTipoLabel } from '../_shared/assetClassMap.ts'
 import { fetchConsolidator, ConsolidatorError } from '../_shared/consolidator.ts'
-import {
-  resolverOuCriarCanonico,
-  sugerirCanonicoComClassificacao,
-  type Identificador,
-} from '../_shared/canonico.ts'
+import { resolverCanonicoAgora, resolverSubTipoAgora } from '../_shared/resolveAgora.ts'
 import { normalizarSubTipo } from '../_shared/normalizarSubTipo.ts'
 import { resolverContaPorId, resolverContaPorCodigo, resolverContaPrimaria, marcarSync } from '../_shared/contas.ts'
 import type { UnifiedAsset } from '../_shared/types.ts'
@@ -65,6 +60,18 @@ Deno.serve(async (req) => {
     // Data canônica = sync − 1 (ontem).
     const dataReferencia    = ontemISO()
     const dataSincronizacao = new Date().toISOString()
+
+    // Arquiva o payload CRU completo (bundle multi-call) → reprocesso sem nova chamada.
+    if (conta.cliente_id && data.rawPayload != null) {
+      const { error: rawErr } = await supabase.from('posicao_raw').upsert({
+        cliente_id:      conta.cliente_id,
+        conta_id:        conta.id,
+        instituicao:     'AGORA',
+        data_referencia: dataReferencia,
+        payload:         data.rawPayload,
+      }, { onConflict: 'conta_id,instituicao,data_referencia' })
+      if (rawErr) console.error('Erro ao arquivar posicao_raw AGORA:', rawErr.message)
+    }
 
     // Resolver canônico por ativo
     const ativoCanonicoIds: (string | null)[] = []
@@ -219,58 +226,8 @@ Deno.serve(async (req) => {
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Resolução de canônico (Ágora)
-// Prioridade: security_code (ISIN) > CNPJ > ticker > TD composto (bondType + vencimento)
-// ─────────────────────────────────────────────────────────────────────────────
-
-async function resolverCanonicoAgora(supabase: any, a: UnifiedAsset): Promise<string | null> {
-  const lookup = coletarIdentificadoresAgora(a)
-  const principal = lookup[0]
-  if (!principal) return null
-
-  const subTipoNormalizado = normalizarSubTipo(resolverSubTipoAgora(a))
-
-  return await resolverOuCriarCanonico(
-    supabase,
-    lookup,
-    sugerirCanonicoComClassificacao(a, 'AGORA', { sub_tipo_canonico: subTipoNormalizado }),
-    {
-      instituicao_origem:      'AGORA',
-      identificador_principal: principal,
-      nome_ativo:              a.name || '',
-      emissor_original:        a.extra?.issuerName ?? a.extra?.companyName ?? a.name ?? null,
-      classe_original:         mapTipoLabel(a.assetClass),
-      liquidez_api_original:   a.isLiquidity ? '0' : null,
-      vencimento_api_original: toDateOnly(a.maturityDate),
-      index_rate:              a.indexRate ?? null,
-    },
-    a.extra ?? null,                                       // o extra da Ágora já é o cru genérico
-    extrairDetalhes('AGORA', subTipoNormalizado, a.extra),
-  )
-}
-
-function coletarIdentificadoresAgora(a: UnifiedAsset): Identificador[] {
-  const ids: Identificador[] = []
-  if (a.securityCode)      ids.push({ tipo: 'ISIN',   codigo: a.securityCode })
-  if (a.extra?.cnpj)       ids.push({ tipo: 'CNPJ',   codigo: a.extra.cnpj })
-  if (a.ticker)            ids.push({ tipo: 'TICKER', codigo: a.ticker })
-
-  // Tesouro Direto: chave composta bondType + vencimento
-  if (a.extra?.bondType && a.maturityDate) {
-    const composto = `${a.extra.bondType}-${toDateOnly(a.maturityDate)}`
-    ids.push({ tipo: 'TICKER', codigo: composto })
-  }
-
-  return ids
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
-
-function resolverSubTipoAgora(a: UnifiedAsset): string {
-  return a.extra?.bondType || a.extra?.securityType || mapSubTipoPadrao(a.assetClass) || ''
-}
 
 function calcularTotais(assets: UnifiedAsset[], totalAmount: number) {
   const t = {

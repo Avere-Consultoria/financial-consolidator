@@ -4,36 +4,38 @@ import { validarAuth, ehChamadaSistema } from '../_shared/auth.ts'
 import { fetchConsolidator, ConsolidatorError } from '../_shared/consolidator.ts'
 import { resolverContaPorId } from '../_shared/contas.ts'
 import { resolverCanonicoXP } from '../_shared/resolveXP.ts'
+import { resolverCanonicoBTG } from '../_shared/resolveBTG.ts'
+import { resolverCanonicoAgora } from '../_shared/resolveAgora.ts'
+import { resolverCanonicoAvenue } from '../_shared/resolveAvenue.ts'
 import type { UnifiedAsset } from '../_shared/types.ts'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Edge Function: reprocessar-canonicos
 // Deploy: supabase functions deploy reprocessar-canonicos --no-verify-jwt
 //
-// Re-resolve os ativos CANÔNICOS a partir do raw já arquivado (posicao_raw),
-// SEM nova chamada à corretora: lê o payload → /transform (re-mapeia com a lógica
-// ATUAL do connector) → resolverCanonicoXP por ativo (mesmo resolver do sync).
-// NÃO escreve snapshot nem toca posicao_*; só atualiza canônico/dicionário e
-// semeia biblioteca quando vazia. Respeita precedência (não pisa em 'manual').
+// Re-resolve os ativos CANÔNICOS a partir do raw já arquivado (posicao_raw), SEM
+// nova chamada à corretora. NÃO escreve snapshot nem toca posicao_*; só atualiza
+// canônico/dicionário e semeia biblioteca quando vazia. Respeita precedência (não
+// pisa em 'manual'). Cobre "mudei um mapeamento / não extraí um campo" sem gastar
+// a janela de chamada. Só posição VIVA (o que está em posicao_raw).
 //
-// Cobre o caso "mudei um mapeamento / não extraí um campo" sem gastar a janela
-// de chamada. Só posição VIVA (o que está em posicao_raw); meses fechados ficam
-// carimbados e intocados.
+// Dois modos por instituição:
+//   XP/BTG/AGORA → /transform re-mapeia o payload → UnifiedAsset[] → resolver.
+//   AVENUE       → resolve direto dos itens crus (a classificação é por item).
 //
 // body: { contaId?, clienteId?, instituicao? }  (qualquer combinação; vazio = tudo)
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Resolvers por instituição. Habilitar BTG/AGORA/AVENUE quando os mappers
-// estiverem exportados no Consolidador (/transform) e o resolver compartilhado existir.
-const RESOLVERS: Record<string, (supabase: any, a: UnifiedAsset) => Promise<string | null>> = {
-  XP: resolverCanonicoXP,
+const VIA_TRANSFORM: Record<string, (supabase: any, a: UnifiedAsset) => Promise<string | null>> = {
+  XP:    resolverCanonicoXP,
+  BTG:   resolverCanonicoBTG,
+  AGORA: resolverCanonicoAgora,
 }
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
-    // Auth: chamada de sistema (cron) ou consultor autenticado.
     const sistema = await ehChamadaSistema(req)
     if (!sistema) {
       const authResult = await validarAuth(req)
@@ -47,7 +49,6 @@ Deno.serve(async (req) => {
     const clienteId: string | null = body.clienteId ?? null
     const instituicao: string | null = body.instituicao ? String(body.instituicao).toUpperCase() : null
 
-    // ── Carrega o raw arquivado no escopo pedido ─────────────────────────────
     let query = supabase
       .from('posicao_raw')
       .select('id, cliente_id, conta_id, instituicao, data_referencia, payload')
@@ -62,35 +63,46 @@ Deno.serve(async (req) => {
       return jsonResponse({ contas: 0, ativos: 0, instituicoes: [], mensagem: 'Nada a reprocessar no escopo.' })
     }
 
-    // Só a posição VIVA mais recente por (conta, instituição) — evita reprocessar
-    // datas antigas (o canônico é por-ativo, idempotente; basta o raw mais novo).
+    // Só a posição VIVA mais recente por (conta, instituição) — o canônico é por-ativo
+    // e idempotente; basta o raw mais novo (rows já vêm ordenadas desc).
     const maisRecente = new Map<string, any>()
     for (const r of rows) {
       const k = `${r.conta_id}|${r.instituicao}`
-      if (!maisRecente.has(k)) maisRecente.set(k, r)   // rows já vêm ordenadas desc
+      if (!maisRecente.has(k)) maisRecente.set(k, r)
     }
 
     let totalAtivos = 0
     let totalContas = 0
     const instituicoesTocadas = new Set<string>()
-    const ignoradas: string[] = []
+    const ignoradas = new Set<string>()
 
     for (const r of maisRecente.values()) {
       const inst = String(r.instituicao).toUpperCase()
-      const resolver = RESOLVERS[inst]
-      if (!resolver) { ignoradas.push(inst); continue }
 
-      // accountNumber é só ecoado pelo mapper; resolvemos para log/coerência.
+      if (inst === 'AVENUE') {
+        // Avenue resolve direto do item cru (sem /transform).
+        const itens: any[] = Array.isArray(r.payload?.items) ? r.payload.items : []
+        for (const item of itens) {
+          await resolverCanonicoAvenue(supabase, item)
+          totalAtivos++
+        }
+        totalContas++
+        instituicoesTocadas.add(inst)
+        continue
+      }
+
+      const resolver = VIA_TRANSFORM[inst]
+      if (!resolver) { ignoradas.add(inst); continue }
+
+      // accountNumber é só ecoado pelo mapper; resolvemos p/ coerência/log.
       const conta = await resolverContaPorId(supabase, r.conta_id)
       const accountNumber = conta?.codigo ?? ''
 
-      // Re-mapeia o payload arquivado com a lógica ATUAL do connector (sem corretora).
       const transformed = await fetchConsolidator('/api/v1/position/transform', {
         method: 'POST',
         body: JSON.stringify({ institution: inst, accountNumber, payload: r.payload }),
       })
       const assets: UnifiedAsset[] = transformed?.data?.assets ?? []
-
       for (const asset of assets) {
         await resolver(supabase, asset)
         totalAtivos++
@@ -103,7 +115,7 @@ Deno.serve(async (req) => {
       contas: totalContas,
       ativos: totalAtivos,
       instituicoes: Array.from(instituicoesTocadas),
-      ignoradas: ignoradas.length ? Array.from(new Set(ignoradas)) : undefined,
+      ignoradas: ignoradas.size ? Array.from(ignoradas) : undefined,
     })
 
   } catch (err: unknown) {

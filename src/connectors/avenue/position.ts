@@ -24,7 +24,9 @@ export async function getAvenuePosition(accountNumber: string): Promise<UnifiedP
 
     logger.info(`Sucesso ao buscar Avenue (ref ${targetDate}). Encontrados ${data?.length ?? 0} ativos.`);
 
-    return mapAvenueToUnifiedPosition(accountNumber, data, targetDate);
+    const pos = mapAvenueToUnifiedPosition(accountNumber, data, targetDate);
+    pos.rawPayload = { items: data, targetDate };   // arquivo p/ replay (mapper precisa do targetDate)
+    return pos;
   } catch (error: any) {
     logger.error(`Falha fatal no getAvenuePosition: ${error.message}`);
     throw error;
