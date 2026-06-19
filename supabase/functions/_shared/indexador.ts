@@ -19,3 +19,18 @@ export function normalizarIndexador(raw: string | null | undefined): string | nu
   for (const [re, canon] of ALIASES) s = s.replace(re, canon);
   return s.trim() || null;
 }
+
+// Padroniza a STRING de taxa vinda pré-formatada da API para o MESMO formato do
+// Master (derivarTaxa): índice normalizado, espaço ao redor do "+", e taxa pura
+// (prefixada, sem indexador) como "Y% a.a.". Sem isto, a Home mostrava a grafia
+// crua da API ("IPCA +6,95%") e a curadoria mostrava "IPCA + 6,95%".
+//   "IPC-A +6,95%" → "IPCA + 6,95%"
+//   "+13,50%"      → "13,50% a.a."
+//   "126,00% CDI"  → "126,00% CDI"  (inalterado)
+export function padronizarTaxa(raw: string | null | undefined): string | null {
+  const s = normalizarIndexador(raw);
+  if (!s) return s;
+  const pura = s.match(/^\+?\s*(\d+(?:[.,]\d+)?)\s*%(?:\s*a\.?\s*a\.?)?$/i);
+  if (pura) return `${pura[1]}% a.a.`;
+  return s.replace(/\s*\+\s*/g, ' + ');
+}

@@ -3,7 +3,7 @@ import { corsHeaders, errorResponse, jsonResponse } from '../_shared/cors.ts'
 import { validarAuth, validarOwnershipCliente, ehChamadaSistema, type AuthContext } from '../_shared/auth.ts'
 import { toDateOnly, ontemISO } from '../_shared/dates.ts'
 import { extrairDetalhes } from '../_shared/detalhes.ts'
-import { normalizarIndexador } from '../_shared/indexador.ts'
+import { normalizarIndexador, padronizarTaxa } from '../_shared/indexador.ts'
 import { mapTipoLabel, mapSubTipoPadrao } from '../_shared/assetClassMap.ts'
 import { fetchConsolidator, ConsolidatorError } from '../_shared/consolidator.ts'
 import {
@@ -111,7 +111,7 @@ Deno.serve(async (req) => {
         custo_total:         a.extra?.costPrice ? Number(a.extra.costPrice) : null,
         preco_unitario:      a.marketPrice ? Number(a.marketPrice) : null,
         quantidade:          Number(a.quantity ?? 1),
-        taxa:                normalizarIndexador(a.extra?.bondRate),
+        taxa:                padronizarTaxa(a.extra?.bondRate),
         taxa_percentual:     a.extra?.preTaxPercentage ? Number(a.extra.preTaxPercentage) : null,
         indexer_percentual:  a.extra?.indexerPercentage ? Number(a.extra.indexerPercentage) : null,
         valorizacao:         a.extra?.valueAppreciation ? Number(a.extra.valueAppreciation) : null,

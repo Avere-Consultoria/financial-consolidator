@@ -4,7 +4,7 @@ import { corsHeaders, errorResponse, jsonResponse } from '../_shared/cors.ts'
 import { validarAuth, validarOwnershipCliente, ehChamadaSistema, type AuthContext } from '../_shared/auth.ts'
 import { toDateOnly, ontemISO } from '../_shared/dates.ts'
 import { extrairDetalhes } from '../_shared/detalhes.ts'
-import { normalizarIndexador } from '../_shared/indexador.ts'
+import { normalizarIndexador, padronizarTaxa } from '../_shared/indexador.ts'
 import { mapTipoLabel, mapSubTipoPadrao } from '../_shared/assetClassMap.ts'
 import { fetchConsolidator, ConsolidatorError } from '../_shared/consolidator.ts'
 import {
@@ -147,7 +147,7 @@ async function resolverCanonicoBTG(supabase: any, a: UnifiedAsset): Promise<stri
 
   const subTipoNormalizado = normalizarSubTipo(parsearTicker(a.ticker ?? '', a.assetClass).subTipo)
 
-  const indexRate = normalizarIndexador(a.indexRate)
+  const indexRate = padronizarTaxa(a.indexRate)
   const override: Record<string, any> = { sub_tipo_canonico: subTipoNormalizado }
   if (indexRate) { override.taxa_canonica = indexRate; override.taxa_formatada = indexRate }
 
@@ -281,7 +281,7 @@ function parseAtivo(a: UnifiedAsset, ativoCanonicoId: string | null) {
   const subTipo        = normalizarSubTipo(subTipoRaw) ?? subTipoRaw
   const emissor        = issuer || a.name || ''
   const tipoLabel      = mapTipoLabel(a.assetClass)
-  const rentabilidade  = normalizarIndexador(formatRentabilidade(a))
+  const rentabilidade  = padronizarTaxa(formatRentabilidade(a))
   const issueDate      = toDateOnly(a.extra?.issueDate)
   const maturityDate   = toDateOnly(a.maturityDate)
 

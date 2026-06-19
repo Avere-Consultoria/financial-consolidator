@@ -1,7 +1,7 @@
 import { classifyAvere, suggestLiquidezAvere } from './classifyAvere.ts'
 import { normalizarSubTipo } from './normalizarSubTipo.ts'
 import { formatarTaxa } from './formatarTaxa.ts'
-import { normalizarIndexador } from './indexador.ts'
+import { normalizarIndexador, padronizarTaxa } from './indexador.ts'
 import type { Institution } from './types.ts'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -292,8 +292,8 @@ export function sugerirCanonicoComClassificacao(
     classe_avere:       classe ?? null,
     liquidez_avere:     liquidez ?? null,
     data_vencimento:    asset.maturityDate ? String(asset.maturityDate).split('T')[0] : null,
-    taxa_canonica:      benchMark ?? bondRate ?? null,
-    taxa_formatada:     taxaFormatada,
+    taxa_canonica:      padronizarTaxa(benchMark ?? bondRate ?? null),
+    taxa_formatada:     padronizarTaxa(taxaFormatada),
     benchmark_canonico: benchMark ?? indexRate ?? null,
     sub_tipo_canonico:  null,
     is_fii:             isFii,

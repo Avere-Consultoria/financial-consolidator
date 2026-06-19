@@ -3,7 +3,7 @@ import { corsHeaders, errorResponse, jsonResponse } from '../_shared/cors.ts'
 import { validarAuth, validarOwnershipCliente, ehChamadaSistema, type AuthContext } from '../_shared/auth.ts'
 import { toDateOnly, ontemISO } from '../_shared/dates.ts'
 import { extrairDetalhes } from '../_shared/detalhes.ts'
-import { normalizarIndexador } from '../_shared/indexador.ts'
+import { normalizarIndexador, padronizarTaxa } from '../_shared/indexador.ts'
 import { mapTipoLabel, mapSubTipoPadrao } from '../_shared/assetClassMap.ts'
 import { fetchConsolidator, ConsolidatorError } from '../_shared/consolidator.ts'
 import {
@@ -190,7 +190,7 @@ async function resolverCanonicoXP(supabase: any, a: UnifiedAsset): Promise<strin
   // A XP entrega a taxa já formatada em taxaCompleta (vem em a.indexRate p/ RF),
   // ex.: "IPC-A +7,55%" / "126,00% CDI". Usa direto como taxa (override),
   // normalizando o indexador (IPC-A → IPCA) p/ casar com o select do Master.
-  const indexRate = normalizarIndexador(a.indexRate)
+  const indexRate = padronizarTaxa(a.indexRate)
   const override: Record<string, any> = { sub_tipo_canonico: subTipoNormalizado }
   if (indexRate) { override.taxa_canonica = indexRate; override.taxa_formatada = indexRate }
 
@@ -267,7 +267,7 @@ function parseAtivo(a: UnifiedAsset, ativoCanonicoId: string | null): ParsedXP {
     valor_imposto_renda: a.incomeTax ?? null,
     benchmark:           normalizarIndexador(a.benchMark),
     indexador:           normalizarIndexador(a.benchMark),
-    rentabilidade:       normalizarIndexador(a.indexRate),   // taxaCompleta ("IPC-A +3,51%") — a Home formata daqui
+    rentabilidade:       padronizarTaxa(a.indexRate),   // taxaCompleta ("IPC-A +3,51%") — a Home formata daqui
     data_vencimento:     toDateOnly(a.maturityDate),
     is_liquidity:        a.isLiquidity ?? false,
     is_isento_ir:        a.extra?.taxFree ?? false,
