@@ -137,6 +137,7 @@ function mapXpPosition(data: any, accountNumber: string): UnifiedPosition {
         cnpj: it.cnpj,
         fundLiquidity: parseDplus(it.periodoCotizacaoResgate) + parseDplus(it.periodoLiquidacaoResgate),
         grupoXp: 'fundos',
+        raw: it,
       },
     });
   }
@@ -164,6 +165,7 @@ function mapXpPosition(data: any, accountNumber: string): UnifiedPosition {
           rating: it.descricaoRatingAgencia,
           cetipCode: it.codigoCetipSelic,
           grupoXp: grp,
+          raw: it,
         },
       });
     }
@@ -189,7 +191,7 @@ function mapXpPosition(data: any, accountNumber: string): UnifiedPosition {
       netValue: num(it.valorFinanceiroLiquido),
       incomeTax: num(it.valorIr),
       maturityDate: str(it.dataVencimento),
-      extra: { issuer: it.nomeEmissor, subTipo: 'COE', grupoXp: 'coe' },
+      extra: { issuer: it.nomeEmissor, subTipo: 'COE', grupoXp: 'coe', raw: it },
     });
   }
 
@@ -204,7 +206,7 @@ function mapXpPosition(data: any, accountNumber: string): UnifiedPosition {
       marketPrice: num(it.precoUnitarioAtual),
       grossValue: num(it.valorAtual),
       netValue: num(it.valorAtual),
-      extra: { grupoXp: 'acoes' },
+      extra: { grupoXp: 'acoes', raw: it },
     });
   }
 
@@ -218,7 +220,7 @@ function mapXpPosition(data: any, accountNumber: string): UnifiedPosition {
       marketPrice: num(it.precoUnitarioAtual),
       grossValue: num(it.valorAtual),
       netValue: num(it.valorAtual),
-      extra: { grupoXp: 'fundosImobiliarios', isFii: true },
+      extra: { grupoXp: 'fundosImobiliarios', isFii: true, raw: it },
     });
   }
 
@@ -232,7 +234,7 @@ function mapXpPosition(data: any, accountNumber: string): UnifiedPosition {
       grossValue: num(it.saldo, it.custo),
       netValue: num(it.saldoLiquido, it.saldo, it.custo),
       maturityDate: str(it.dataEncerramento),
-      extra: { subTipo: 'ESTRUTURADA', issuer: it.tipoEstrutura, grupoXp: 'estruturados' },
+      extra: { subTipo: 'ESTRUTURADA', issuer: it.tipoEstrutura, grupoXp: 'estruturados', raw: it },
     });
   }
 

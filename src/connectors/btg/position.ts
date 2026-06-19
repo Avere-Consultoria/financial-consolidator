@@ -76,6 +76,7 @@ function mapBtgPosition(raw: any, accountNumber: string): UnifiedPosition {
       indexRate: item.ReferenceIndexValue,
       isLiquidity: item.IsLiquidity === 'true',
       extra: {
+        raw: item,                                  // cru genérico → biblioteca/dicionario
         // ── Identificação ─────────────────────────────────────────────────
         issuer: item.Issuer,
         isin: item.ISIN,
@@ -150,6 +151,7 @@ function mapBtgPosition(raw: any, accountNumber: string): UnifiedPosition {
       acquisitionDate: primeiraData,
       benchMark: item.Fund?.BenchMark,
       extra: {
+        raw: item,                                  // cru genérico → biblioteca/dicionario
         manager: item.Fund?.ManagerName,
         fundLiquidity: item.Fund?.FundLiquidity,
         cnpj: item.Fund?.FundCNPJCode,
@@ -177,6 +179,30 @@ function mapBtgPosition(raw: any, accountNumber: string): UnifiedPosition {
     });
   }
 
+  // ── COE (FixedIncomeStructuredNote) ─────────────────────────────────────────
+  for (const item of raw.FixedIncomeStructuredNote ?? []) {
+    assets.push({
+      assetClass: 'OTHER',
+      name: item.FantasyName || item.Description || item.Ticker || 'COE',
+      ticker: item.Ticker,
+      securityCode: item.SecurityCode,
+      quantity: parseFloat(item.Quantity ?? '0'),
+      marketPrice: parseFloat(item.Price ?? '0'),
+      grossValue: parseFloat(item.GrossValue ?? '0'),
+      netValue: parseFloat(item.NetValue ?? '0'),
+      incomeTax: parseFloat(item.IncomeTax ?? '0'),
+      maturityDate: item.MaturityDate,
+      benchMark: item.ReferenceIndexName,
+      extra: {
+        raw: item,
+        issuer: item.Issuer,
+        subTipo: 'COE',
+        cetipCode: item.CetipCode,
+        issueDate: item.IssueDate ?? null,
+      },
+    });
+  }
+
   // ── Ações (StockPositions) ──────────────────────────────────────────────────
   for (const eq of raw.Equities ?? []) {
     for (const item of eq.StockPositions ?? []) {
@@ -190,6 +216,7 @@ function mapBtgPosition(raw: any, accountNumber: string): UnifiedPosition {
         grossValue: parseFloat(item.GrossValue ?? '0'),
         costPrice: parseFloat(item.CostPrice ?? '0'),
         extra: {
+          raw: item,
           isFII: item.IsFII,
           sector: item.SectorDescription,
           isin: item.ISINCode,
@@ -292,6 +319,7 @@ function mapBtgPosition(raw: any, accountNumber: string): UnifiedPosition {
         benchMark: 'CDI',
         indexRate: ci.Name?.Indexador ?? null,
         extra: {
+          raw: ci,
           subTipo: 'CAIXA',
           issueDate: ci.IssueDate ?? null,
           maturityDate: ci.MaturityDate ?? null,   // nominal (rolagem automática)

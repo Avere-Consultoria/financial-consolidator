@@ -67,6 +67,8 @@ export async function resolverOuCriarCanonico(
   identificadoresParaLookup: Identificador[],
   sugestao: CanonicoSugerido,
   visao: VisaoInstitucional,
+  dadosBrutos?: any,                            // payload cru (genérico) da API → dicionario_ativos
+  detalhesApi?: Record<string, any> | null,     // detalhes extraídos → semeia biblioteca_ativos
 ): Promise<string | null> {
 
   // ── 0. Sem identificadores → impossível resolver ────────────────────────
@@ -97,7 +99,7 @@ export async function resolverOuCriarCanonico(
   })
   const { data: hitBib } = await supabase
     .from('biblioteca_ativos')
-    .select('classe_avere, benchmark, liquidez, taxa_formatada, sub_tipo')
+    .select('chave, detalhes, classe_avere, benchmark, liquidez, taxa_formatada, sub_tipo')
     .in('chave', chaves)
     .limit(1)
   const bib = hitBib?.[0] ?? null
@@ -181,6 +183,7 @@ export async function resolverOuCriarCanonico(
       vencimento_api_original:   visao.vencimento_api_original,
       index_rate:                visao.index_rate,
       taxa_formatada:            sugestao.taxa_formatada,
+      dados_brutos:              dadosBrutos ?? null,     // cru genérico da fonte
       ativo_canonico_id:         ativoCanonicoId,
     }, {
       onConflict: 'instituicao_origem,codigo_identificador,tipo_identificador',
@@ -190,6 +193,21 @@ export async function resolverOuCriarCanonico(
   if (errUpsert) {
     console.error('canonico/upsert dicionario erro:', errUpsert.message)
     // mesmo com erro no dicionário, retorna o canônico pra não bloquear posição
+  }
+
+  // ── 4. Semeia a biblioteca com os detalhes da API — auto-preenchimento do editor.
+  //       Só quando ainda NÃO há detalhes (não pisa na curadoria do Master).
+  if (detalhesApi && Object.keys(detalhesApi).length > 0) {
+    const jaTemDetalhes = bib?.detalhes && Object.keys(bib.detalhes).length > 0
+    if (!jaTemDetalhes) {
+      const chaveBib = bib?.chave ?? chaves[0]
+      await supabase.from('biblioteca_ativos').upsert({
+        chave:    chaveBib,
+        sub_tipo: sugestao.sub_tipo_canonico ?? null,
+        nome_ref: sugestao.nome_canonico ?? null,
+        detalhes: detalhesApi,
+      }, { onConflict: 'chave' })
+    }
   }
 
   return ativoCanonicoId

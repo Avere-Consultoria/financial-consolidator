@@ -2,6 +2,7 @@ import { createServiceClient } from '../_shared/supabaseClient.ts'
 import { corsHeaders, errorResponse, jsonResponse } from '../_shared/cors.ts'
 import { validarAuth, validarOwnershipCliente, ehChamadaSistema, type AuthContext } from '../_shared/auth.ts'
 import { toDateOnly, ontemISO } from '../_shared/dates.ts'
+import { extrairDetalhes } from '../_shared/detalhes.ts'
 import { mapTipoLabel, mapSubTipoPadrao } from '../_shared/assetClassMap.ts'
 import { fetchConsolidator, ConsolidatorError } from '../_shared/consolidator.ts'
 import {
@@ -204,6 +205,8 @@ async function resolverCanonicoXP(supabase: any, a: UnifiedAsset): Promise<strin
       vencimento_api_original: toDateOnly(a.maturityDate),
       index_rate:              a.indexRate ?? null,
     },
+    a.extra?.raw ?? null,                                       // cru genérico → dicionario_ativos
+    extrairDetalhes('XP', subTipoNormalizado, a.extra?.raw),    // detalhes → semeia biblioteca
   )
 }
 

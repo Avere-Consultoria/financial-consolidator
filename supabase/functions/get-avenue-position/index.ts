@@ -3,6 +3,7 @@ import { createServiceClient } from '../_shared/supabaseClient.ts'
 import { corsHeaders, errorResponse, jsonResponse } from '../_shared/cors.ts'
 import { validarAuth, validarOwnershipCliente, ehChamadaSistema, type AuthContext } from '../_shared/auth.ts'
 import { toDateOnly } from '../_shared/dates.ts'
+import { extrairDetalhes } from '../_shared/detalhes.ts'
 import { fetchConsolidator, ConsolidatorError } from '../_shared/consolidator.ts'
 import {
   resolverOuCriarCanonico,
@@ -211,6 +212,8 @@ async function resolverCanonicoAvenue(supabase: any, item: any): Promise<string 
       vencimento_api_original: toDateOnly(item.maturityDate),
       index_rate:              null,
     },
+    item,                                                       // cru (linha AUC) → dicionario
+    extrairDetalhes('AVENUE', sugestao.sub_tipo_canonico, item),
   )
 }
 

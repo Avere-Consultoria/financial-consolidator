@@ -2,6 +2,7 @@ import { createServiceClient } from '../_shared/supabaseClient.ts'
 import { corsHeaders, errorResponse, jsonResponse } from '../_shared/cors.ts'
 import { validarAuth, validarOwnershipCliente, ehChamadaSistema, type AuthContext } from '../_shared/auth.ts'
 import { toDateOnly, ontemISO } from '../_shared/dates.ts'
+import { extrairDetalhes } from '../_shared/detalhes.ts'
 import { mapTipoLabel, mapSubTipoPadrao } from '../_shared/assetClassMap.ts'
 import { fetchConsolidator, ConsolidatorError } from '../_shared/consolidator.ts'
 import {
@@ -242,6 +243,8 @@ async function resolverCanonicoAgora(supabase: any, a: UnifiedAsset): Promise<st
       vencimento_api_original: toDateOnly(a.maturityDate),
       index_rate:              a.indexRate ?? null,
     },
+    a.extra ?? null,                                       // o extra da Ágora já é o cru genérico
+    extrairDetalhes('AGORA', subTipoNormalizado, a.extra),
   )
 }
 
