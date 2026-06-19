@@ -120,7 +120,7 @@ export function classifyAvere(p: ClassifyInput): ClasseAvere | null {
 
     // Indexador explícito (aceita variações: a XP manda "IPC-A" com hífen)
     if (/IPCA|IPC-A|IGP|INPC/.test(bench))           return 'RF - Inflação'
-    if (/\bPRE\b|PREFIXAD/.test(bench))              return 'RF - Prefixado'
+    if (/\bPR[EÉ]\b|PREFIXAD/.test(bench))           return 'RF - Prefixado'
     if (/CDI|SELIC|\bDI\b/.test(bench))              return 'RF - Pós-fixado'
 
     // Tipo do título como segunda fonte (Ágora bondType / BTG subTipo)

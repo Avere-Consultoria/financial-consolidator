@@ -1,6 +1,7 @@
 import { classifyAvere, suggestLiquidezAvere } from './classifyAvere.ts'
 import { normalizarSubTipo } from './normalizarSubTipo.ts'
 import { formatarTaxa } from './formatarTaxa.ts'
+import { normalizarIndexador } from './indexador.ts'
 import type { Institution } from './types.ts'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -246,6 +247,12 @@ export function sugerirCanonicoComClassificacao(
   const isFii = detectarIsFii(asset.name, isFiiApi)
   const isCoe = detectarIsCoe(asset.name, asset.extra?.productType ?? asset.extra?.bondType)
 
+  // Normaliza a grafia do indexador na entrada (ex.: XP grava "IPC-A" → "IPCA"),
+  // num único ponto, para que select do Master e taxa de saída fiquem padronizados.
+  const benchMark = normalizarIndexador(asset.benchMark)
+  const indexRate = normalizarIndexador(asset.indexRate)
+  const bondRate  = normalizarIndexador(asset.extra?.bondRate)
+
   // Classificação só aceita a flag explícita da API — nome não decide classe
   // (princípio "classificação por certeza"; o is_fii por nome segue só como
   // metadado de exibição).
@@ -254,8 +261,8 @@ export function sugerirCanonicoComClassificacao(
     institution,
     maturityDate: asset.maturityDate ?? null,
     isLiquidity:  asset.isLiquidity  ?? false,
-    benchMark:    asset.benchMark    ?? asset.extra?.bondRate ?? null,
-    indexRate:    asset.indexRate    ?? null,
+    benchMark:    benchMark          ?? bondRate ?? null,
+    indexRate:    indexRate          ?? null,
     bondType:     asset.extra?.bondType ?? null,
     subTipo:      asset.extra?.subTipo ?? null,   // XP entrega o tipo do título em extra.subTipo (LFT/NTN-B/CDB…)
     name:         asset.name         ?? null,
@@ -273,21 +280,21 @@ export function sugerirCanonicoComClassificacao(
 
   // Taxa pronta p/ exibição (TAXA + CUPOM), igual à Home. Best-effort: usa os
   // campos padrão do UnifiedAsset; onde não há cupom, cai no índice (sem regressão).
-  const rentabilidade = asset.indexRate ?? asset.benchMark ?? asset.extra?.bondRate ?? null
+  const rentabilidade = indexRate ?? benchMark ?? bondRate ?? null
   const taxaFormatada = formatarTaxa(
     rentabilidade,
-    asset.benchMark ?? asset.indexRate ?? null,
+    benchMark ?? indexRate ?? null,
     asset.extra?.yieldAvg ?? null,
-  ) ?? (asset.benchMark ?? asset.indexRate ?? asset.extra?.bondRate ?? null)
+  ) ?? (benchMark ?? indexRate ?? bondRate ?? null)
 
   return {
     nome_canonico:      asset.name || 'Ativo sem nome',
     classe_avere:       classe ?? null,
     liquidez_avere:     liquidez ?? null,
     data_vencimento:    asset.maturityDate ? String(asset.maturityDate).split('T')[0] : null,
-    taxa_canonica:      asset.benchMark ?? asset.extra?.bondRate ?? null,
+    taxa_canonica:      benchMark ?? bondRate ?? null,
     taxa_formatada:     taxaFormatada,
-    benchmark_canonico: asset.benchMark ?? asset.indexRate ?? null,
+    benchmark_canonico: benchMark ?? indexRate ?? null,
     sub_tipo_canonico:  null,
     is_fii:             isFii,
     is_coe:             isCoe,
