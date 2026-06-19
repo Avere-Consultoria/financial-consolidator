@@ -3,6 +3,7 @@ import {
   getPositionByInstitution,
   getConsolidatedPosition,
 } from '../services/positionService';
+import { transformPayload } from '../services/transformService';
 import { cacheService } from '../cache';
 import { ApiResponse, Institution, ConsolidatorError } from '../types';
 import { logger } from '../utils/logger';
@@ -252,6 +253,37 @@ router.get('/avenue/:cpf', async (req: Request, res: Response) => {
     return res.json(response);
   } catch (err) {
     return handleError(err, res, 'AVENUE');
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/v1/position/transform
+// Re-mapeia um payload CRU já arquivado (posicao_raw) com a lógica ATUAL do
+// connector, SEM chamar a corretora. Motor do reprocesso de canônicos.
+//   body: { institution, accountNumber, payload }
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/transform', (req: Request, res: Response) => {
+  const { institution, accountNumber, payload } = req.body ?? {};
+  if (!institution || !payload) {
+    return res.status(400).json({
+      success: false,
+      error: { code: 'BAD_REQUEST', message: 'institution e payload são obrigatórios' },
+    });
+  }
+  try {
+    const data = transformPayload(
+      String(institution).toUpperCase() as Institution,
+      String(accountNumber ?? ''),
+      payload,
+    );
+    const response: ApiResponse<typeof data> = {
+      success: true,
+      data,
+      meta: { fetchedAt: new Date().toISOString() },
+    };
+    return res.json(response);
+  } catch (err) {
+    return handleError(err, res);
   }
 });
 

@@ -2,15 +2,10 @@ import { createServiceClient } from '../_shared/supabaseClient.ts'
 import { corsHeaders, errorResponse, jsonResponse } from '../_shared/cors.ts'
 import { validarAuth, validarOwnershipCliente, ehChamadaSistema, type AuthContext } from '../_shared/auth.ts'
 import { toDateOnly, ontemISO } from '../_shared/dates.ts'
-import { extrairDetalhes } from '../_shared/detalhes.ts'
 import { normalizarIndexador, padronizarTaxa } from '../_shared/indexador.ts'
-import { mapTipoLabel, mapSubTipoPadrao } from '../_shared/assetClassMap.ts'
+import { mapTipoLabel } from '../_shared/assetClassMap.ts'
 import { fetchConsolidator, ConsolidatorError } from '../_shared/consolidator.ts'
-import {
-  resolverOuCriarCanonico,
-  sugerirCanonicoComClassificacao,
-  type Identificador,
-} from '../_shared/canonico.ts'
+import { resolverCanonicoXP, resolverSubTipoXP } from '../_shared/resolveXP.ts'
 import { normalizarSubTipo } from '../_shared/normalizarSubTipo.ts'
 import { resolverContaPorId, resolverContaPorCodigo, marcarSync } from '../_shared/contas.ts'
 import type { UnifiedAsset } from '../_shared/types.ts'
@@ -72,6 +67,19 @@ Deno.serve(async (req) => {
     // D0 construída na hora → representa o fechamento de ontem. Data canônica = sync − 1.
     const dataReferencia    = ontemISO()
     const dataSincronizacao = new Date().toISOString()
+
+    // Arquiva o payload CRU completo (posicao_raw) → permite reprocessar canônicos
+    // do raw, sem nova chamada à corretora. Best-effort: não bloqueia o sync.
+    if (clientId && position.rawPayload != null) {
+      const { error: rawErr } = await supabase.from('posicao_raw').upsert({
+        cliente_id:      clientId,
+        conta_id:        conta.id,
+        instituicao:     'XP',
+        data_referencia: dataReferencia,
+        payload:         position.rawPayload,
+      }, { onConflict: 'conta_id,instituicao,data_referencia' })
+      if (rawErr) console.error('Erro ao arquivar posicao_raw XP:', rawErr.message)
+    }
 
     // ── Resolver canônico por ativo, sequencial ──────────────────────────
     const parsedBruto: ParsedXP[] = []
@@ -175,52 +183,6 @@ Deno.serve(async (req) => {
   }
 })
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Resolução de canônico (XP)
-// Prioridade: ISIN > CNPJ > security_code/codigo_ativo > TICKER
-// ─────────────────────────────────────────────────────────────────────────────
-
-async function resolverCanonicoXP(supabase: any, a: UnifiedAsset): Promise<string | null> {
-  const lookup: Identificador[] = coletarIdentificadoresXP(a)
-  const principal = lookup[0]
-  if (!principal) return null
-
-  const subTipoNormalizado = normalizarSubTipo(resolverSubTipo(a))
-
-  // A XP entrega a taxa já formatada em taxaCompleta (vem em a.indexRate p/ RF),
-  // ex.: "IPC-A +7,55%" / "126,00% CDI". Usa direto como taxa (override),
-  // normalizando o indexador (IPC-A → IPCA) p/ casar com o select do Master.
-  const indexRate = padronizarTaxa(a.indexRate)
-  const override: Record<string, any> = { sub_tipo_canonico: subTipoNormalizado }
-  if (indexRate) { override.taxa_canonica = indexRate; override.taxa_formatada = indexRate }
-
-  return await resolverOuCriarCanonico(
-    supabase,
-    lookup,
-    sugerirCanonicoComClassificacao(a, 'XP', override),
-    {
-      instituicao_origem:      'XP',
-      identificador_principal: principal,
-      nome_ativo:              a.name || '',
-      emissor_original:        a.name || null,
-      classe_original:         mapTipoLabel(a.assetClass),
-      liquidez_api_original:   a.isLiquidity ? '0' : null,
-      vencimento_api_original: toDateOnly(a.maturityDate),
-      index_rate:              a.indexRate ?? null,
-    },
-    a.extra?.raw ?? null,                                       // cru genérico → dicionario_ativos
-    extrairDetalhes('XP', subTipoNormalizado, a.extra?.raw),    // detalhes → semeia biblioteca
-  )
-}
-
-function coletarIdentificadoresXP(a: UnifiedAsset): Identificador[] {
-  const ids: Identificador[] = []
-  if (a.extra?.isin)   ids.push({ tipo: 'ISIN',   codigo: a.extra.isin })
-  if (a.extra?.cnpj)   ids.push({ tipo: 'CNPJ',   codigo: a.extra.cnpj })
-  if (a.securityCode)  ids.push({ tipo: 'TICKER', codigo: a.securityCode })
-  if (a.ticker)        ids.push({ tipo: 'TICKER', codigo: a.ticker })
-  return ids
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // parseAtivo
@@ -240,7 +202,7 @@ interface ParsedXP {
 
 function parseAtivo(a: UnifiedAsset, ativoCanonicoId: string | null): ParsedXP {
   const tipoLabel = mapTipoLabel(a.assetClass)
-  const subTipoRaw = resolverSubTipo(a)
+  const subTipoRaw = resolverSubTipoXP(a)
   const subTipo    = normalizarSubTipo(subTipoRaw) ?? subTipoRaw
   const upperName = (a.name ?? '').toUpperCase()
   const isFii     = !!a.extra?.isFII || upperName.includes('FII')
@@ -334,21 +296,3 @@ function calcularTotais(parsed: ParsedXP[]) {
   return t
 }
 
-function resolverSubTipo(a: UnifiedAsset): string {
-  // A XP entrega a categoria pronta (CDB/DEB/CRA/CRI/LF/NTN-B/LFT/LTN/CDCA/COE)
-  // em extra.subTipo — é a fonte mais confiável. normalizarSubTipo padroniza depois.
-  if (a.extra?.subTipo) return String(a.extra.subTipo).toUpperCase().trim()
-
-  const type = (a.extra?.productType ?? a.extra?.productCategory ?? '').toLowerCase()
-  if (!type) return mapSubTipoPadrao(a.assetClass)
-  if (type.includes('cdb'))                                       return 'CDB'
-  if (type.includes('lci'))                                       return 'LCI'
-  if (type.includes('lca'))                                       return 'LCA'
-  if (type.includes('cra'))                                       return 'CRA'
-  if (type.includes('cri'))                                       return 'CRI'
-  if (type.includes('debenture') || type.includes('debênture'))   return 'DEB'
-  if (type.includes('tesouro'))                                   return 'TD'
-  if (type.includes('fii'))                                       return 'FII'
-  if (type.includes('fundo') || type.includes('fund'))            return 'FI'
-  return mapSubTipoPadrao(a.assetClass)
-}

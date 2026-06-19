@@ -29,6 +29,9 @@ export interface UnifiedPosition {
     source: string;
     fetchedAt: string;
   };
+  // Resposta CRUA e completa da corretora (verbatim), p/ arquivo em posicao_raw e
+  // replay via /transform (reprocesso de canônicos sem nova chamada à corretora).
+  rawPayload?: unknown;
 }
 
 export interface UnifiedAsset {

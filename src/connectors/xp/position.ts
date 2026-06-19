@@ -114,7 +114,7 @@ function coletarArrays(obj: any, achados: Record<string, any[]> = {}, prof = 0):
 // Estrutura real: data.posicaoDetalhada.{financeiro, fundos, rendaFixa, tesouroDireto,
 // previdencia, coe, acoes, ...}. Cada classe é { nome, itens:[], saldo, ... }.
 // O patrimônio total é posicaoDetalhada.patrimonioTotal e fecha com a soma dos saldos.
-function mapXpPosition(data: any, accountNumber: string): UnifiedPosition {
+export function mapXpPosition(data: any, accountNumber: string): UnifiedPosition {
   const pd = data?.posicaoDetalhada ?? {};
   const assets: UnifiedAsset[] = [];
   const positionDate = str(pd?.financeiro?.dataPosicaoD0, pd?.dataAtualizacao) ?? new Date().toISOString();
@@ -262,6 +262,7 @@ function mapXpPosition(data: any, accountNumber: string): UnifiedPosition {
     currency: 'BRL',
     assets,
     rawMeta: { source: 'XP Data Access API v1', fetchedAt: new Date().toISOString() },
+    rawPayload: data,
   };
 }
 
