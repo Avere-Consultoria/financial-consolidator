@@ -28,8 +28,11 @@ export function normalizarIndexador(raw: string | null | undefined): string | nu
 //   "+13,50%"      → "13,50% a.a."
 //   "126,00% CDI"  → "126,00% CDI"  (inalterado)
 export function padronizarTaxa(raw: string | null | undefined): string | null {
-  const s = normalizarIndexador(raw);
-  if (!s) return s;
+  const s0 = normalizarIndexador(raw);
+  if (!s0) return s0;
+  // Decimal de ponto → vírgula (padrão BR). A Ágora manda "IPCA + 9.39% a.a.";
+  // só troca o ponto ENTRE DÍGITOS, então "a.a." (sem dígitos ao redor) fica intacto.
+  const s = s0.replace(/(\d)\.(\d)/g, '$1,$2');
   const pura = s.match(/^\+?\s*(\d+(?:[.,]\d+)?)\s*%(?:\s*a\.?\s*a\.?)?$/i);
   if (pura) return `${pura[1]}% a.a.`;
   return s.replace(/\s*\+\s*/g, ' + ');

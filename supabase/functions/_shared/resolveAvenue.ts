@@ -17,12 +17,30 @@ import { toDateOnly } from './dates.ts'
 import { extrairDetalhes } from './detalhes.ts'
 
 export function classificarProductType(type: string): string {
-  if (type.includes('Balance')) return 'CASH'
-  if (type.includes('Bonds'))   return 'FIXED_INCOME'
-  if (type.includes('Funds'))   return 'INVESTMENT_FUND'
-  if (type.includes('Stocks') || type.includes('ETF') || type.includes('UCIT')) return 'EQUITIES'
-  if (type.includes('Crypto'))  return 'CRYPTO'
+  const t = type || ''
+  // Cash-like: saldo em conta (Balance US Clearing/Banking, Banking, Clearing).
+  if (t.includes('Balance') || t.includes('Banking') || t.includes('Clearing')) return 'CASH'
+  if (t.includes('Bonds'))   return 'FIXED_INCOME'
+  if (t.includes('Funds'))   return 'INVESTMENT_FUND'
+  if (t.includes('Option'))  return 'DERIVATIVE'
+  if (t.includes('Stocks') || t.includes('ETF') || t.includes('UCIT')) return 'EQUITIES'
+  if (t.includes('Crypto'))  return 'CRYPTO'
   return 'OTHER'
+}
+
+// productType da Avenue (inglês) → subtipo padronizado p/ o canônico.
+// Não mapeado → cai no normalizarSubTipo (preserva o original, visível p/ mapear depois).
+export function subTipoAvenue(productType: string | null | undefined): string | null {
+  const t = (productType || '').trim()
+  if (!t) return null
+  if (t.includes('Balance') || t.includes('Banking') || t.includes('Clearing')) return 'CAIXA'
+  if (t.includes('Bonds'))  return 'BOND'
+  if (t.includes('Funds'))  return 'FUNDO'
+  if (t.includes('Option')) return 'OPÇÃO'
+  if (t.includes('ETF') || t.includes('UCIT')) return 'ETF'
+  if (t.includes('Stocks')) return 'AÇÃO'
+  if (t.includes('Crypto')) return 'CRIPTO'
+  return normalizarSubTipo(t)
 }
 
 export function mapTipoLabelAvenue(assetClass: string): string {
@@ -74,7 +92,7 @@ export async function resolverCanonicoAvenue(supabase: any, item: any): Promise<
     taxa_canonica:      null,
     taxa_formatada:     null,
     benchmark_canonico: null,
-    sub_tipo_canonico:  normalizarSubTipo(productType),
+    sub_tipo_canonico:  subTipoAvenue(productType),
     is_fii:             detectarIsFii(item.productName),
     is_coe:             false,
   }
