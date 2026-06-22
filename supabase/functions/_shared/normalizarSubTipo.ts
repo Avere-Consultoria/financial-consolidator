@@ -19,6 +19,8 @@ const MAPA: Record<string, string> = {
 
   'LETRA FINANCEIRA':                         'LF',
   'LETRA FINANCEIRA SUBORDINADA':             'LF',
+  'LFSN':                                     'LF',
+  'LFSC':                                     'LF',
   'LF':                                       'LF',
 
   'LETRA DE CREDITO IMOBILIARIO':             'LCI',
@@ -27,7 +29,18 @@ const MAPA: Record<string, string> = {
 
   'LETRA DE CREDITO DO AGRONEGOCIO':          'LCA',
   'LETRA DE CRÉDITO DO AGRONEGÓCIO':          'LCA',
+  'LETRA DE CREDITO AGRICOLA':                'LCA',
+  'LETRA DE CRÉDITO AGRÍCOLA':                'LCA',
+  'LCA PRE':                                  'LCA',
   'LCA':                                      'LCA',
+
+  'LETRA DE CREDITO DO DESENVOLVIMENTO':      'LCD',
+  'LETRA DE CRÉDITO DO DESENVOLVIMENTO':      'LCD',
+  'LCD':                                      'LCD',
+
+  'LETRA IMOBILIARIA GARANTIDA':              'LIG',
+  'LETRA IMOBILIÁRIA GARANTIDA':              'LIG',
+  'LIG':                                      'LIG',
 
   'CERTIFICADO DE RECEBIVEIS DO AGRONEGOCIO': 'CRA',
   'CERTIFICADO DE RECEBÍVEIS DO AGRONEGÓCIO': 'CRA',
@@ -46,6 +59,7 @@ const MAPA: Record<string, string> = {
   // ── Tesouro Direto ────────────────────────────────────────────────────────
   'NTN-B':                                    'NTNB',
   'NTN-B PRINC':                              'NTNB',
+  'NTNB PRINC':                               'NTNB',
   'NTN-B PRINCIPAL':                          'NTNB',
   'NTN-B COM JUROS SEMESTRAL':                'NTNB',
   'NTNB':                                     'NTNB',
@@ -75,8 +89,10 @@ const MAPA: Record<string, string> = {
   'OPERAÇÃO COMPROMISSADA':                   'COMPROMISSADA',
   'COMPROMISSADA':                            'COMPROMISSADA',
 
-  // ── Fundos: token padrão do sistema é FUNDO (FI é alias legado) ────────────
+  // ── Fundos: token padrão do sistema é FUNDO (FI/VIS/FND são aliases) ───────
   'FI':                                       'FUNDO',
+  'VIS':                                      'FUNDO',   // Ágora (ex.: "FI BRAD BINC")
+  'FND':                                      'FUNDO',   // XP (ex.: "FND CONSIGNADO INSS")
   'FUNDO':                                    'FUNDO',
 }
 

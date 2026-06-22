@@ -4,15 +4,16 @@
 // É o que faz os campos do editor nascerem PRÉ-PREENCHIDOS (em vez de vazios).
 // ─────────────────────────────────────────────────────────────────────────────
 
-type Grupo = 'RF' | 'FUNDO' | 'RV' | 'COE'
+type Grupo = 'RF' | 'FUNDO' | 'RV' | 'COE' | 'ESTRUTURADA'
 
 const SUBTIPO_GRUPO: Record<string, Grupo> = {
   CDB: 'RF', LCI: 'RF', LCA: 'RF', CRA: 'RF', CRI: 'RF', DEB: 'RF', 'DEBÊNTURE': 'RF',
   CDCA: 'RF', LF: 'RF', LFT: 'RF', LTN: 'RF', 'NTN-B': 'RF', 'NTN-F': 'RF', NTNB: 'RF',
-  NTNF: 'RF', LCD: 'RF', RDB: 'RF', LIG: 'RF',
+  NTNF: 'RF', NTNC: 'RF', LCD: 'RF', RDB: 'RF', LIG: 'RF', COMPROMISSADA: 'RF', CAIXA: 'RF',
   FUNDO: 'FUNDO', FI: 'FUNDO',
   'AÇÃO': 'RV', ACAO: 'RV', ETF: 'RV', FII: 'RV',
   COE: 'COE',
+  ESTRUTURADA: 'ESTRUTURADA',
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -56,6 +57,11 @@ const MAPAS: Record<string, Partial<Record<Grupo, (it: any) => Record<string, an
     COE: (it) => ({
       rating:   juntar(it.descricaoRatingAgencia, it.nomeAgenciaRating),
       carencia: soData(it.dataCarencia),
+    }),
+    ESTRUTURADA: (it) => ({
+      tipo_estrutura:    it.tipoEstrutura,
+      ativo_base:        it.ativo,
+      data_encerramento: soData(it.dataEncerramento),
     }),
   },
   BTG: {

@@ -6,7 +6,7 @@ import { toDateOnly, ontemISO } from '../_shared/dates.ts'
 import { normalizarIndexador, padronizarTaxa } from '../_shared/indexador.ts'
 import { mapTipoLabel } from '../_shared/assetClassMap.ts'
 import { fetchConsolidator, ConsolidatorError } from '../_shared/consolidator.ts'
-import { resolverCanonicoBTG, parsearTicker } from '../_shared/resolveBTG.ts'
+import { resolverCanonicoBTG, resolverSubTipoBTG, parsearTicker } from '../_shared/resolveBTG.ts'
 import { normalizarSubTipo } from '../_shared/normalizarSubTipo.ts'
 import { resolverContaPorId, resolverContaPorCodigo, marcarSync } from '../_shared/contas.ts'
 import type { UnifiedAsset } from '../_shared/types.ts'
@@ -237,7 +237,8 @@ async function persistirAtivos(
 function parseAtivo(a: UnifiedAsset, ativoCanonicoId: string | null) {
   const ticker         = a.ticker ?? ''
   const issuer         = a.extra?.issuer ?? ''
-  const { subTipo: subTipoRaw, codigo } = parsearTicker(ticker, a.assetClass)
+  const { codigo }     = parsearTicker(ticker, a.assetClass)
+  const subTipoRaw     = resolverSubTipoBTG(a)
   const subTipo        = normalizarSubTipo(subTipoRaw) ?? subTipoRaw
   const emissor        = issuer || a.name || ''
   const tipoLabel      = mapTipoLabel(a.assetClass)

@@ -114,9 +114,10 @@ export async function resolverOuCriarCanonico(
   const liquidezFinal  = bib?.liquidez       ?? sugestao.liquidez_avere
   const taxaFmtFinal   = bib?.taxa_formatada ?? sugestao.taxa_formatada
   const taxaCanonFinal = bib?.taxa_formatada ?? sugestao.taxa_canonica
-  // Normaliza o subtipo da biblioteca também — um valor legado (ex.: 'FI') vira o
-  // token padrão ('FUNDO') no reprocesso, sem precisar truncar a biblioteca.
-  const subTipoFinal   = normalizarSubTipo(bib?.sub_tipo) ?? sugestao.sub_tipo_canonico
+  // Subtipo é DERIVADO (não curado à mão) → a derivação fresca SEMPRE vence; a
+  // biblioteca é só fallback. Sem isso, um valor legado preso na biblioteca (ticker
+  // de ação, 'FI' antigo) bloquearia a correção no reprocesso.
+  const subTipoFinal   = sugestao.sub_tipo_canonico ?? normalizarSubTipo(bib?.sub_tipo)
 
   // ── 2. Não achou → cria canônico novo ──────────────────────────────────
   if (!ativoCanonicoId) {

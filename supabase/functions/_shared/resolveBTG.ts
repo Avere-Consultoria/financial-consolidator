@@ -26,6 +26,21 @@ export function parsearTicker(ticker: string, assetClass: string): { subTipo: st
   return { subTipo: ticker, codigo: '' }
 }
 
+// Subtipo do BTG. O `parsearTicker` só entende o formato RF "PREFIXO-CODIGO"; pra
+// ação/FII/ETF (ticker sem hífen) ele devolveria o TICKER como subtipo (lixo). Aqui:
+//  - extra.subTipo explícito (CAIXA do CDIE, COE) tem prioridade;
+//  - EQUITIES → FII (se marcado) senão AÇÃO (ETF/BDR caem em AÇÃO — decisão atual);
+//  - DERIVATIVE → OPÇÃO;
+//  - RF e demais → prefixo do ticker.
+export function resolverSubTipoBTG(a: UnifiedAsset): string {
+  if (a.extra?.subTipo) return String(a.extra.subTipo).toUpperCase().trim()
+  if (a.assetClass === 'EQUITIES') {
+    return (a.extra?.isFII === true || a.extra?.isFII === 'true') ? 'FII' : 'AÇÃO'
+  }
+  if (a.assetClass === 'DERIVATIVE') return 'OPÇÃO'
+  return parsearTicker(a.ticker ?? '', a.assetClass).subTipo
+}
+
 export function coletarIdentificadoresBTG(a: UnifiedAsset): Identificador[] {
   const ids: Identificador[] = []
   if (a.extra?.isin)        ids.push({ tipo: 'ISIN',   codigo: a.extra.isin })
@@ -41,7 +56,7 @@ export async function resolverCanonicoBTG(supabase: any, a: UnifiedAsset): Promi
   const principal = lookup[0]
   if (!principal) return null
 
-  const subTipoNormalizado = normalizarSubTipo(parsearTicker(a.ticker ?? '', a.assetClass).subTipo)
+  const subTipoNormalizado = normalizarSubTipo(resolverSubTipoBTG(a))
 
   const indexRate = padronizarTaxa(a.indexRate)
   const override: Record<string, any> = { sub_tipo_canonico: subTipoNormalizado }
