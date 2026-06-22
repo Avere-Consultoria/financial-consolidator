@@ -49,9 +49,11 @@ Deno.serve(async (req) => {
     const clienteId: string | null = body.clienteId ?? null
     const instituicao: string | null = body.instituicao ? String(body.instituicao).toUpperCase() : null
 
+    // 1) Carrega só as CHAVES (sem payload) — leve. Carregar todos os payloads de
+    //    uma vez estourava a memória da edge (546/WORKER_LIMIT) com a base cheia.
     let query = supabase
       .from('posicao_raw')
-      .select('id, cliente_id, conta_id, instituicao, data_referencia, payload')
+      .select('id, cliente_id, conta_id, instituicao, data_referencia')
       .order('data_referencia', { ascending: false })
     if (contaId)     query = query.eq('conta_id', contaId)
     if (clienteId)   query = query.eq('cliente_id', clienteId)
@@ -78,10 +80,18 @@ Deno.serve(async (req) => {
 
     for (const r of maisRecente.values()) {
       const inst = String(r.instituicao).toUpperCase()
+      const resolver = inst === 'AVENUE' ? null : VIA_TRANSFORM[inst]
+      if (inst !== 'AVENUE' && !resolver) { ignoradas.add(inst); continue }
+
+      // 2) Carrega o payload SÓ desta conta (um por vez → não estoura a memória).
+      const { data: linha } = await supabase
+        .from('posicao_raw').select('payload').eq('id', r.id).single()
+      const payload = linha?.payload
+      if (payload == null) continue
 
       if (inst === 'AVENUE') {
         // Avenue resolve direto do item cru (sem /transform).
-        const itens: any[] = Array.isArray(r.payload?.items) ? r.payload.items : []
+        const itens: any[] = Array.isArray(payload?.items) ? payload.items : []
         for (const item of itens) {
           await resolverCanonicoAvenue(supabase, item)
           totalAtivos++
@@ -91,20 +101,17 @@ Deno.serve(async (req) => {
         continue
       }
 
-      const resolver = VIA_TRANSFORM[inst]
-      if (!resolver) { ignoradas.add(inst); continue }
-
       // accountNumber é só ecoado pelo mapper; resolvemos p/ coerência/log.
       const conta = await resolverContaPorId(supabase, r.conta_id)
       const accountNumber = conta?.codigo ?? ''
 
       const transformed = await fetchConsolidator('/api/v1/position/transform', {
         method: 'POST',
-        body: JSON.stringify({ institution: inst, accountNumber, payload: r.payload }),
+        body: JSON.stringify({ institution: inst, accountNumber, payload }),
       })
       const assets: UnifiedAsset[] = transformed?.data?.assets ?? []
       for (const asset of assets) {
-        await resolver(supabase, asset)
+        await resolver!(supabase, asset)
         totalAtivos++
       }
       totalContas++
