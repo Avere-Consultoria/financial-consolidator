@@ -14,7 +14,10 @@ const PORT = process.env.PORT ?? 3333;
 
 // ─── Middlewares de segurança ──────────────────────────────────────────────────
 app.use(helmet());
-app.use(express.json());
+// Limite alto: o /transform recebe o payload CRU inteiro da corretora (a posição
+// detalhada da XP de um cliente grande passa fácil dos 100kb padrão → 413). Canal
+// interno (x-api-key + mTLS), tráfego vem da nossa própria edge.
+app.use(express.json({ limit: '50mb' }));
 
 const limiter = rateLimit({
   windowMs: 60 * 1000,

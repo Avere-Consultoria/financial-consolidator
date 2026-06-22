@@ -48,6 +48,10 @@ Deno.serve(async (req) => {
     const contaId: string | null = body.contaId ?? null
     const clienteId: string | null = body.clienteId ?? null
     const instituicao: string | null = body.instituicao ? String(body.instituicao).toUpperCase() : null
+    // Lote: o front chama em fatias p/ não estourar o tempo/CPU da edge (WORKER_LIMIT)
+    // com a base cheia. Cada chamada processa `limite` contas a partir de `offset`.
+    const limite = Number(body.limite) > 0 ? Number(body.limite) : 5
+    const offset = Number(body.offset) >= 0 ? Number(body.offset) : 0
 
     // 1) Carrega só as CHAVES (sem payload) — leve. Carregar todos os payloads de
     //    uma vez estourava a memória da edge (546/WORKER_LIMIT) com a base cheia.
@@ -73,54 +77,68 @@ Deno.serve(async (req) => {
       if (!maisRecente.has(k)) maisRecente.set(k, r)
     }
 
+    // Ordena estável (por id) p/ a paginação por offset ser determinística entre chamadas.
+    const lista = Array.from(maisRecente.values()).sort((a, b) => String(a.id).localeCompare(String(b.id)))
+    const totalContasEscopo = lista.length
+    const fatia = lista.slice(offset, offset + limite)
+
     let totalAtivos = 0
     let totalContas = 0
+    let falhas = 0
     const instituicoesTocadas = new Set<string>()
     const ignoradas = new Set<string>()
 
-    for (const r of maisRecente.values()) {
+    for (const r of fatia) {
       const inst = String(r.instituicao).toUpperCase()
       const resolver = inst === 'AVENUE' ? null : VIA_TRANSFORM[inst]
       if (inst !== 'AVENUE' && !resolver) { ignoradas.add(inst); continue }
 
-      // 2) Carrega o payload SÓ desta conta (um por vez → não estoura a memória).
-      const { data: linha } = await supabase
-        .from('posicao_raw').select('payload').eq('id', r.id).single()
-      const payload = linha?.payload
-      if (payload == null) continue
+      // Resiliente: uma conta que falhe (payload gigante, etc.) é registrada e
+      // pulada — não derruba o lote nem aborta o loop do front.
+      try {
+        // 2) Carrega o payload SÓ desta conta (um por vez → não estoura a memória).
+        const { data: linha } = await supabase
+          .from('posicao_raw').select('payload').eq('id', r.id).single()
+        const payload = linha?.payload
+        if (payload == null) continue
 
-      if (inst === 'AVENUE') {
-        // Avenue resolve direto do item cru (sem /transform).
-        const itens: any[] = Array.isArray(payload?.items) ? payload.items : []
-        for (const item of itens) {
-          await resolverCanonicoAvenue(supabase, item)
-          totalAtivos++
+        if (inst === 'AVENUE') {
+          // Avenue resolve direto do item cru (sem /transform).
+          const itens: any[] = Array.isArray(payload?.items) ? payload.items : []
+          for (const item of itens) {
+            await resolverCanonicoAvenue(supabase, item)
+            totalAtivos++
+          }
+        } else {
+          // accountNumber é só ecoado pelo mapper; resolvemos p/ coerência/log.
+          const conta = await resolverContaPorId(supabase, r.conta_id)
+          const accountNumber = conta?.codigo ?? ''
+
+          const transformed = await fetchConsolidator('/api/v1/position/transform', {
+            method: 'POST',
+            body: JSON.stringify({ institution: inst, accountNumber, payload }),
+          })
+          const assets: UnifiedAsset[] = transformed?.data?.assets ?? []
+          for (const asset of assets) {
+            await resolver!(supabase, asset)
+            totalAtivos++
+          }
         }
         totalContas++
         instituicoesTocadas.add(inst)
-        continue
+      } catch (e) {
+        falhas++
+        console.error(`reprocesso: falha na conta ${r.conta_id} (${inst}):`, (e as Error)?.message)
       }
-
-      // accountNumber é só ecoado pelo mapper; resolvemos p/ coerência/log.
-      const conta = await resolverContaPorId(supabase, r.conta_id)
-      const accountNumber = conta?.codigo ?? ''
-
-      const transformed = await fetchConsolidator('/api/v1/position/transform', {
-        method: 'POST',
-        body: JSON.stringify({ institution: inst, accountNumber, payload }),
-      })
-      const assets: UnifiedAsset[] = transformed?.data?.assets ?? []
-      for (const asset of assets) {
-        await resolver!(supabase, asset)
-        totalAtivos++
-      }
-      totalContas++
-      instituicoesTocadas.add(inst)
     }
 
+    const offsetProximo = offset + limite < totalContasEscopo ? offset + limite : null
     return jsonResponse({
-      contas: totalContas,
+      contas: totalContas,                 // contas processadas NESTA fatia
+      contasTotal: totalContasEscopo,      // total no escopo
       ativos: totalAtivos,
+      falhas,                              // contas puladas por erro nesta fatia
+      offsetProximo,                       // null = acabou; senão, chamar de novo com este offset
       instituicoes: Array.from(instituicoesTocadas),
       ignoradas: ignoradas.size ? Array.from(ignoradas) : undefined,
     })
