@@ -94,6 +94,7 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => null)
     const snapshot = body?.snapshot
     const ativos: ManualAtivo[] = Array.isArray(body?.ativos) ? body.ativos : []
+    const envioId: string | null = body?.envio_id ?? body?.snapshot?.envio_id ?? null   // ecoado pela IA p/ fechar o loop
 
     if (!snapshot?.cliente_cod_avere || !snapshot?.instituicao || !snapshot?.data_referencia) {
       return errorResponse('snapshot precisa de cliente_cod_avere, instituicao e data_referencia.', 400)
@@ -251,11 +252,19 @@ Deno.serve(async (req) => {
       await supabase.from('instituicoes').insert({ nome: instituicao, cor_primaria: '#64748B', tipo: 'MANUAL' })
     }
 
+    // Fecha o loop de auditoria: marca o envio como processado (se a IA ecoou o envio_id).
+    if (envioId) {
+      await supabase.from('envio_pdf_manual')
+        .update({ status: 'processado', processado_em: new Date().toISOString(), snapshot_id: snap.id })
+        .eq('id', envioId)
+    }
+
     return jsonResponse({
       ok: true,
       instituicao,
       data_referencia: dataReferencia,
       snapshot_id: snap.id,
+      envio_id: envioId,
       ativos_inseridos: ativosInseridos,
       canonicos_resolvidos: canonicosResolvidos,
       erros,
