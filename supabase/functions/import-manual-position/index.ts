@@ -146,6 +146,10 @@ Deno.serve(async (req) => {
 
         let canonicoId: string | null = null
         if (ids.length > 0) {
+          // Entrada manual = fonte de menor confiança: LÊ o global (vincula a um
+          // canônico que já exista), mas NUNCA escreve nele. Sem match → fica local
+          // (canônico nulo). Promover ao global é ação humana. Ver
+          // docs/posicao-manual-politica.md.
           canonicoId = await resolverOuCriarCanonico(
             supabase,
             ids,
@@ -160,6 +164,9 @@ Deno.serve(async (req) => {
               vencimento_api_original: toDateOnly(unified.maturityDate),
               index_rate:              a.benchmark ?? null,
             },
+            undefined,
+            null,
+            { naoEscreverGlobal: true },
           )
         }
         if (canonicoId) canonicosResolvidos++

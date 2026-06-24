@@ -70,6 +70,7 @@ export async function resolverOuCriarCanonico(
   visao: VisaoInstitucional,
   dadosBrutos?: any,                            // payload cru (genérico) da API → dicionario_ativos
   detalhesApi?: Record<string, any> | null,     // detalhes extraídos → semeia biblioteca_ativos
+  opts: { naoEscreverGlobal?: boolean } = {},   // entrada manual: lê o global, nunca escreve
 ): Promise<string | null> {
 
   // ── 0. Sem identificadores → impossível resolver ────────────────────────
@@ -91,6 +92,13 @@ export async function resolverOuCriarCanonico(
   }
 
   let ativoCanonicoId: string | null = candidatos?.[0]?.ativo_canonico_id ?? null
+
+  // ── Modo read-only (entrada manual / PDF): a fonte de MENOR confiança LÊ o global
+  //    mas NUNCA escreve. Vincula só se um canônico JÁ existir (Camada 2 — herda o
+  //    rico); senão fica local na posição do cliente (Camada 1 → null). Nunca cria,
+  //    nunca aplica AUTO-CURA, nunca semeia biblioteca/dicionário. Promover ao global
+  //    é ação humana. Ver docs/posicao-manual-politica.md.
+  if (opts.naoEscreverGlobal) return ativoCanonicoId
 
   // Biblioteca rica: identificador imutável → dados-base curados (vencem o derivado).
   // CNPJ normalizado para 14 dígitos; demais chaves em maiúsculas.

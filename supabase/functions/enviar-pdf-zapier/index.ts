@@ -102,29 +102,41 @@ Deno.serve(async (req) => {
     // Multipart: TODOS os arquivos sob o MESMO campo 'arquivos' (repetido) → o Zapier
     // expõe como ARRAY nativo, que ele itera sem gambiarra (recomendação do master).
     // Cada blob já carrega o nome do arquivo.
-    // 'arquivos' = lista de arquivos; 'arquivos_nome' = lista de nomes paralela (mesmo
-    // índice). O blob já carrega o nome, mas o Zapier nem sempre expõe → manda separado.
-    const fd = new FormData()
-    for (const a of arquivos) {
-      fd.append('arquivos', new Blob([a.bytes], { type: a.tipo }), a.nome)
-      fd.append('arquivos_nome', a.nome)
+    // UM POST por arquivo: cada arquivo vira um disparo separado do webhook (o Zapier
+    // recebe N eventos, cada um com 1 arquivo no campo 'arquivo' — sem array/loop lá).
+    // Todos compartilham o envio_id; arquivo_indice/arquivo_qtd deixam a IA reagrupar.
+    const meta: Record<string, string> = {
+      ...(envioId ? { envio_id: envioId } : {}),         // ← a IA devolve isto no import
+      codigo_avere:    cliente.codigo_avere ?? '',
+      nome_cliente:    cliente.nome ?? '',
+      documento:       cliente.documento ?? '',
+      consultor:       (consultor as any)?.nome ?? '',
+      instituicao:     inst.nome ?? '',
+      data_referencia: dataReferencia,
+      arquivo_qtd:     String(arquivos.length),
     }
-    fd.append('arquivo_qtd',     String(arquivos.length))
-    if (envioId) fd.append('envio_id', envioId)            // ← a IA devolve isto no import
-    fd.append('codigo_avere',    cliente.codigo_avere ?? '')
-    fd.append('nome_cliente',    cliente.nome ?? '')
-    fd.append('documento',       cliente.documento ?? '')
-    fd.append('consultor',       (consultor as any)?.nome ?? '')
-    fd.append('instituicao',     inst.nome ?? '')
-    fd.append('data_referencia', dataReferencia)
 
     let status = 'enviado'
     let detalhe: string | null = null
-    try {
-      const r = await fetch(webhook, { method: 'POST', body: fd })
-      if (!r.ok) { status = 'erro'; detalhe = `Zapier respondeu ${r.status}: ${(await r.text().catch(() => '')).slice(0, 300)}` }
-    } catch (e) {
-      status = 'erro'; detalhe = `Falha ao chamar o Zapier: ${(e as Error)?.message}`
+    for (let i = 0; i < arquivos.length; i++) {
+      const a = arquivos[i]
+      const fd = new FormData()
+      fd.append('arquivo', new Blob([a.bytes], { type: a.tipo }), a.nome)
+      fd.append('arquivo_nome',   a.nome)
+      fd.append('arquivo_indice', String(i + 1))         // 1..N
+      for (const [k, v] of Object.entries(meta)) fd.append(k, v)
+      try {
+        const r = await fetch(webhook, { method: 'POST', body: fd })
+        if (!r.ok) {
+          status = 'erro'
+          detalhe = `Zapier respondeu ${r.status} no arquivo ${i + 1}/${arquivos.length}: ${(await r.text().catch(() => '')).slice(0, 200)}`
+          break
+        }
+      } catch (e) {
+        status = 'erro'
+        detalhe = `Falha ao chamar o Zapier no arquivo ${i + 1}/${arquivos.length}: ${(e as Error)?.message}`
+        break
+      }
     }
 
     // Falhou no Zapier → marca o envio como erro.
