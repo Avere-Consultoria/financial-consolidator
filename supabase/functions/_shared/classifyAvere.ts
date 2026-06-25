@@ -34,8 +34,8 @@ export type ClasseAvere =
   | 'Estruturada'
   | 'Alternativos'
   | 'Internacional - Pós-fixado'
-  | 'Internacional - RF Inflação'
-  | 'Internacional - RF Prefixado'
+  | 'Internacional - RF - Inflação'
+  | 'Internacional - RF - Prefixado'
   | 'Internacional - Multimercado'
   | 'Internacional - Renda Variável'
   | 'Caixa'
@@ -70,7 +70,7 @@ export function classifyAvere(p: ClassifyInput): ClasseAvere | null {
     if (assetClass === 'INVESTMENT_FUND' || prodType.includes('FUNDS')) return 'Internacional - Multimercado'
     if (assetClass === 'FIXED_INCOME'    || prodType.includes('BONDS')) {
       // [TODO-3] Todos bonds internacionais = RF Prefixado por falta de benchmark
-      return 'Internacional - RF Prefixado'
+      return 'Internacional - RF - Prefixado'
     }
     return 'Internacional - Renda Variável'
   }
