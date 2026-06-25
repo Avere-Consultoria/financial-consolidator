@@ -1,5 +1,6 @@
 import axios from 'axios';
 import * as https from 'https';
+import * as tls from 'tls';
 import { logger } from '../../utils/logger';
 import { ConsolidatorError } from '../../types';
 import { loadCert } from '../../utils/certLoader';
@@ -40,17 +41,27 @@ export function getXpHttpsAgent(): https.Agent {
     // (fora da CA store do Node), fornecer a cadeia via XP_CA_BASE64/XP_CA_PATH.
     // XP_TLS_INSECURE=true desliga a validação SOMENTE para desenvolvimento
     // (ex.: certificado provisório atual) — nunca usar em produção.
-    const insecure = process.env.XP_TLS_INSECURE === 'true';
+    // XP_TLS_INSECURE só vale FORA de produção. Em produção é IGNORADO (fail-safe):
+    // nunca desliga a verificação TLS no ambiente real, mesmo se a env vier setada.
+    const insecure = process.env.XP_TLS_INSECURE === 'true'
+      && process.env.NODE_ENV !== 'production';
     if (insecure) {
       logger.warn('XP: validação TLS DESATIVADA (XP_TLS_INSECURE=true) — apenas dev');
     }
 
-    let ca: Buffer | undefined;
+    // Cadeia ICP-Brasil da XP (XP_CA_BASE64), MESCLADA com as CAs públicas padrão
+    // do Node. Sem a mescla, o token em login.microsoftonline.com (cert público,
+    // fora da ICP-Brasil) quebraria assim que a verificação volta a ficar ligada,
+    // pois passar `ca` substitui a store padrão do Node.
+    let caExtra: Buffer | undefined;
     try {
-      ca = loadCert('XP_CA_BASE64', 'XP_CA_PATH');
+      caExtra = loadCert('XP_CA_BASE64', 'XP_CA_PATH');
     } catch {
-      ca = undefined; // cadeia extra é opcional
+      caExtra = undefined; // cadeia extra é opcional
     }
+    const ca = caExtra
+      ? [...tls.rootCertificates, caExtra.toString('utf8')]
+      : undefined;
 
     // Opção 1 (mais simples): o .pfx/.p12 inteiro (cert + chave juntos), como a
     // XP entrega. Base64 do arquivo + senha em XP_PFX_PASSWORD. Sem openssl.
