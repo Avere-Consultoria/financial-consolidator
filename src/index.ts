@@ -4,7 +4,6 @@ import express from 'express';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import positionRoutes from './routes/position';
-import agoraRoutes from './routes/agora';
 import avenueRoutes from './routes/avenue'; // 1. IMPORTAR A ROTA DA AVENUE
 import { logger } from './utils/logger';
 
@@ -40,7 +39,7 @@ app.get('/health', (_req, res) => {
 // Tudo abaixo (as rotas /api/v1) exige o header x-api-key. O /health acima fica livre.
 const CONSOLIDATOR_SECRET = process.env.CONSOLIDATOR_SECRET;
 if (!CONSOLIDATOR_SECRET) {
-  logger.warn('⚠️  CONSOLIDATOR_SECRET não configurado — canal SEM proteção (defina a env var).');
+  logger.warn('⚠️  CONSOLIDATOR_SECRET não configurado — canal FECHADO (defina a env var; só passa em NODE_ENV=development).');
 }
 // Comparação em tempo constante (anti timing-attack): compara digests SHA-256,
 // que têm tamanho fixo — não vaza nem o tamanho nem o ponto de divergência.
@@ -48,7 +47,12 @@ const secretDigest = CONSOLIDATOR_SECRET
   ? crypto.createHash('sha256').update(CONSOLIDATOR_SECRET).digest()
   : null;
 app.use((req, res, next) => {
-  if (!secretDigest) return next(); // tolerante durante a transição (sem env)
+  if (!secretDigest) {
+    // Fail-closed: sem segredo configurado, FECHA o canal — exceto em dev local
+    // explícito (NODE_ENV=development). Evita expor a API por env faltando.
+    if (process.env.NODE_ENV === 'development') return next();
+    return res.status(503).json({ success: false, error: { code: 'NO_SECRET', message: 'Serviço não configurado' } });
+  }
   const provided = req.get('x-api-key') ?? '';
   const providedDigest = crypto.createHash('sha256').update(provided).digest();
   if (!crypto.timingSafeEqual(providedDigest, secretDigest)) {
@@ -59,7 +63,6 @@ app.use((req, res, next) => {
 
 // ─── Rotas ─────────────────────────────────────────────────────────────────────
 app.use('/api/v1/position', positionRoutes);
-app.use('/api/v1/agora', agoraRoutes);
 app.use('/api/v1/avenue', avenueRoutes); // 2. PENDURAR A ROTA COM O PREFIXO DA API
 
 // ─── 404 ───────────────────────────────────────────────────────────────────────
