@@ -37,6 +37,21 @@ Deno.serve(async (req: Request) => {
 
     const admin = createServiceClient()
 
+    // 0. Pré-checagem: o consultor precisa existir ANTES de criarmos login/perfil —
+    //    senão um consultor_id inválido deixaria um usuário de Auth órfão (update
+    //    em 0 linhas não dá erro). Confere também que o e-mail bate com o cadastro.
+    const { data: consultor, error: errBusca } = await admin
+      .from('consultores')
+      .select('id, email_professional')
+      .eq('id', consultor_id)
+      .maybeSingle()
+    if (errBusca) return errorResponse(`Falha ao localizar consultor: ${errBusca.message}`, 400)
+    if (!consultor) return errorResponse('Consultor não encontrado', 404)
+    if (consultor.email_professional &&
+        consultor.email_professional.toLowerCase() !== String(email).toLowerCase()) {
+      return errorResponse('O e-mail informado não confere com o cadastro do consultor', 400)
+    }
+
     // 1. Usuário de login (idempotente): cria; se já existir, redefine a senha.
     let uid: string
     const { data: created, error: errCreate } = await admin.auth.admin.createUser({
@@ -70,13 +85,15 @@ Deno.serve(async (req: Request) => {
       return errorResponse(`Falha ao criar perfil: ${errPerfil.message}`, 400)
     }
 
-    // 3. Vínculo consultor ↔ login
-    const { error: errLink } = await admin.from('consultores')
+    // 3. Vínculo consultor ↔ login. `.select()` confirma que UMA linha foi afetada:
+    //    update sem match volta sucesso com 0 linhas, então sem isso um órfão passaria.
+    const { data: linkRows, error: errLink } = await admin.from('consultores')
       .update({ perfil_id: uid })
       .eq('id', consultor_id)
-    if (errLink) {
+      .select('id')
+    if (errLink || !linkRows || linkRows.length === 0) {
       if (criadoAgora) { await admin.from('perfis').delete().eq('id', uid); await admin.auth.admin.deleteUser(uid) }
-      return errorResponse(`Falha ao vincular consultor: ${errLink.message}`, 400)
+      return errorResponse(`Falha ao vincular consultor: ${errLink?.message ?? 'consultor não encontrado'}`, 400)
     }
 
     return jsonResponse({ success: true, user_id: uid, email, senha })
