@@ -52,11 +52,16 @@ export function coletarIdentificadoresBTG(a: UnifiedAsset): Identificador[] {
 }
 
 export async function resolverCanonicoBTG(supabase: any, a: UnifiedAsset): Promise<string | null> {
-  const lookup: Identificador[] = coletarIdentificadoresBTG(a)
+  const subTipoNormalizado = normalizarSubTipo(resolverSubTipoBTG(a))
+
+  // Caixa remunerada (CDIE): o ticker do BTG é transitório (id de posição), então
+  // cada registro virava um canônico novo → centenas de "CDIE" duplicados. Como é
+  // tudo o mesmo conceito (caixa), resolve para uma identidade FIXA → 1 canônico.
+  const lookup: Identificador[] = subTipoNormalizado === 'CAIXA'
+    ? [{ tipo: 'TICKER', codigo: 'BTG-CAIXA' }]
+    : coletarIdentificadoresBTG(a)
   const principal = lookup[0]
   if (!principal) return null
-
-  const subTipoNormalizado = normalizarSubTipo(resolverSubTipoBTG(a))
 
   const indexRate = padronizarTaxa(a.indexRate)
   const override: Record<string, any> = { sub_tipo_canonico: subTipoNormalizado }

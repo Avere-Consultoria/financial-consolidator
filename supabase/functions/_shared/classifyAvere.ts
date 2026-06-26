@@ -82,6 +82,11 @@ export function classifyAvere(p: ClassifyInput): ClasseAvere | null {
   // conector mapeia como OTHER com subtipo ESTRUTURADA.
   if (bondType.includes('ESTRUTURAD')) return 'Estruturada'
 
+  // Caixa remunerada (ex.: CDIE do BTG) chega com subtipo CAIXA explícito — sinal
+  // confiável. Decide direto, sem depender de assetClass/vencimento (que variavam e
+  // geravam Caixa/Conta Corrente/RF inconsistentes para o mesmo produto).
+  if (bondType.includes('CAIXA')) return 'Caixa'
+
   // ── Doméstico (BTG / Ágora / XP) ──────────────────────────────────────────
   if (assetClass === 'CASH')      return 'Conta Corrente'
   if (assetClass === 'CRYPTO')    return 'Alternativos'
