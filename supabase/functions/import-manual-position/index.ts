@@ -219,34 +219,103 @@ Deno.serve(async (req) => {
       return errorResponse(`Falha ao salvar snapshot: ${snapErr?.message}`, 500)
     }
 
-    // ── Substitui ativos do snapshot ───────────────────────────────────────
-    await supabase.from('posicao_manual_ativos').delete().eq('snapshot_id', snap.id)
+    // ── Substitui ativos do snapshot — com TRAVA contra sobrescrita (#46c) ──
+    // Linhas que o master editou (editado_em != null) são FIXADAS: o re-import não
+    // as apaga e não as duplica. Se a IA reextrai classificação diferente de uma
+    // linha fixada, marcamos conflito_reimport (a edição vence, mas o selo avisa).
+    const { data: editadasRaw } = await supabase
+      .from('posicao_manual_ativos')
+      .select('id, asset_class, tipo, sub_tipo, emissor, cnpj, ticker, isin, benchmark, data_vencimento')
+      .eq('snapshot_id', snap.id)
+      .not('editado_em', 'is', null)
+    const fixadas = editadasRaw ?? []
+
+    // Casa um ativo a uma linha fixada por QUALQUER chave em comum: cada identidade
+    // (ISIN, ticker, CNPJ-se-fundo) + a assinatura (sub_tipo + nome normalizado).
+    // Casar por interseção, e não só pela chave de maior prioridade, evita que uma
+    // edição que ENRIQUECEU a identidade (ex.: master adicionou o ISIN que faltava)
+    // deixe a IA recriar um gêmeo por não bater a chave principal.
+    const norm = (s?: string | null) =>
+      (s ?? '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toUpperCase().replace(/\s+/g, ' ').trim()
+    const ehFundo = (r: any) =>
+      norm(r.asset_class).includes('FUND') || norm(r.tipo).includes('FUND') || norm(r.sub_tipo) === 'FUNDO'
+    const chaves = (r: any): string[] => {
+      const ks: string[] = []
+      const isin = norm(r.isin);   if (isin) ks.push(`I:${isin}`)
+      const tk   = norm(r.ticker); if (tk)   ks.push(`T:${tk}`)
+      const cnpj = (r.cnpj ?? '').replace(/\D/g, ''); if (cnpj && ehFundo(r)) ks.push(`C:${cnpj}`)
+      const sig = `N:${norm(r.sub_tipo)}|${norm(r.emissor)}`
+      if (sig !== 'N:|') ks.push(sig)
+      return ks
+    }
+    const difere = (a: string | null, b: string | null) => norm(a) !== norm(b)
+    const classificacaoDifere = (fix: any, ai: any) =>
+      difere(fix.tipo, ai.tipo) || difere(fix.sub_tipo, ai.sub_tipo) || difere(fix.emissor, ai.emissor) ||
+      difere(fix.benchmark, ai.benchmark) ||
+      (toDateOnly(fix.data_vencimento) ?? '') !== (toDateOnly(ai.data_vencimento) ?? '')
+    // Índice chave → linha fixada. Casa por interseção de chaves no momento do match.
+    const indiceFixadas = new Map<string, any>()
+    for (const fix of fixadas) for (const k of chaves(fix)) indiceFixadas.set(k, fix)
+
+    // Apaga só as NÃO editadas; as fixadas permanecem.
+    await supabase.from('posicao_manual_ativos').delete().eq('snapshot_id', snap.id).is('editado_em', null)
 
     let ativosInseridos = 0
+    const conflitos: { id: string; dados: any }[] = []
     if (ativos.length > 0) {
-      const rows = ativos.map((a, i) => ({
-        snapshot_id:       snap.id,
-        ativo_canonico_id: ativoCanonicoIds[i],
-        asset_class:       a.asset_class ?? null,
-        tipo:              mapTipoLabel(a.asset_class ?? 'OTHER'),
-        sub_tipo:          normalizarSubTipo(a.sub_tipo ?? ''),
-        emissor:           nomeEmissor(a) || a.ticker || null,
-        cnpj:              a.emissor_cnpj ? String(a.emissor_cnpj).replace(/\D/g, '') : null,
-        ticker:            a.ticker ?? null,
-        isin:              a.isin ?? null,
-        valor_bruto:       a.valor_bruto ?? null,
-        valor_liquido:     a.valor_liquido ?? a.valor_bruto ?? null,
-        quantidade:        a.quantidade ?? null,
-        preco_mercado:     a.preco_mercado ?? null,
-        data_vencimento:   toDateOnly(a.maturity_date ?? a.data_vencimento),
-        data_aplicacao:    toDateOnly(a.issue_date ?? a.data_aplicacao),
-        benchmark:         a.benchmark ?? null,
-        rentabilidade:     a.rentabilidade ?? null,
-        yield_avg:         a.yield_avg ?? null,
-      }))
-      const { error: ativosErr } = await supabase.from('posicao_manual_ativos').insert(rows)
-      if (ativosErr) return errorResponse(`Falha ao salvar ativos: ${ativosErr.message}`, 500)
-      ativosInseridos = rows.length
+      const rows: any[] = []
+      ativos.forEach((a, i) => {
+        const row = {
+          snapshot_id:       snap.id,
+          ativo_canonico_id: ativoCanonicoIds[i],
+          asset_class:       a.asset_class ?? null,
+          tipo:              mapTipoLabel(a.asset_class ?? 'OTHER'),
+          sub_tipo:          normalizarSubTipo(a.sub_tipo ?? ''),
+          emissor:           nomeEmissor(a) || a.ticker || null,
+          cnpj:              a.emissor_cnpj ? String(a.emissor_cnpj).replace(/\D/g, '') : null,
+          ticker:            a.ticker ?? null,
+          isin:              a.isin ?? null,
+          valor_bruto:       a.valor_bruto ?? null,
+          valor_liquido:     a.valor_liquido ?? a.valor_bruto ?? null,
+          quantidade:        a.quantidade ?? null,
+          preco_mercado:     a.preco_mercado ?? null,
+          data_vencimento:   toDateOnly(a.maturity_date ?? a.data_vencimento),
+          data_aplicacao:    toDateOnly(a.issue_date ?? a.data_aplicacao),
+          benchmark:         a.benchmark ?? null,
+          rentabilidade:     a.rentabilidade ?? null,
+          yield_avg:         a.yield_avg ?? null,
+        }
+        let fix: any = null
+        for (const k of chaves(row)) { const m = indiceFixadas.get(k); if (m) { fix = m; break } }
+        if (fix) {
+          // Colisão com uma linha fixada: a edição do master vence (não reinsere).
+          if (classificacaoDifere(fix, row)) {
+            conflitos.push({
+              id: fix.id,
+              dados: {
+                tipo: row.tipo, sub_tipo: row.sub_tipo, emissor: row.emissor,
+                benchmark: row.benchmark, data_vencimento: row.data_vencimento,
+                detectado_em: new Date().toISOString(),
+              },
+            })
+          }
+          return
+        }
+        rows.push(row)
+      })
+
+      if (rows.length > 0) {
+        const { error: ativosErr } = await supabase.from('posicao_manual_ativos').insert(rows)
+        if (ativosErr) return errorResponse(`Falha ao salvar ativos: ${ativosErr.message}`, 500)
+        ativosInseridos = rows.length
+      }
+    }
+
+    // Carimba o selo de conflito nas linhas fixadas que divergiram da reextração.
+    for (const c of conflitos) {
+      await supabase.from('posicao_manual_ativos')
+        .update({ conflito_reimport: true, conflito_dados: c.dados })
+        .eq('id', c.id)
     }
 
     // ── Auto-registra a instituição (cor padrão, ajustável depois) ─────────
