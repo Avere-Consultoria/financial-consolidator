@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { logger } from '../../utils/logger';
 import { ConsolidatorError } from '../../types';
+import { safeErrData } from '../../utils/mask';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Avenue Auth — Looker API Key Login
@@ -74,7 +75,7 @@ export async function getAvenueToken(): Promise<string> {
 
     logger.error('Avenue: erro ao gerar token', {
       status: err?.response?.status,
-      data: err?.response?.data,
+      motivo: safeErrData(err?.response?.data),
     });
 
     throw new ConsolidatorError(

@@ -2,7 +2,7 @@ import axios from 'axios';
 import { getAvenueToken } from './auth';
 import { ConsolidatorError } from '../../types';
 import { logger } from '../../utils/logger';
-import { maskDoc, maskUrl } from '../../utils/mask';
+import { maskDoc, maskUrl, safeErrData } from '../../utils/mask';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Avenue — AUC (Assets Under Custody)
@@ -81,7 +81,7 @@ export async function getAvenueAuc(date: string, cpf?: string): Promise<AvenueAu
     const status = err?.response?.status;
     const data = err?.response?.data;
 
-    logger.error('Avenue: erro ao buscar AUC', { date, cpf: maskDoc(cpf), status, data });
+    logger.error('Avenue: erro ao buscar AUC', { date, cpf: maskDoc(cpf), status, motivo: safeErrData(data) });
 
     if (status === 401) {
       throw new ConsolidatorError('AVENUE_UNAUTHORIZED', 'Token Avenue inválido ou expirado', 'AVENUE', 401);

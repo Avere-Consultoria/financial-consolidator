@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { getBtgToken } from './auth';
 import { UnifiedPosition, UnifiedAsset, AssetClass, ConsolidatorError } from '../../types';
 import { logger } from '../../utils/logger';
+import { maskDoc, safeErrData } from '../../utils/mask';
 
 const BASE_URL = process.env.BTG_POSITION_BASE_URL ?? 'https://api.btgpactual.com/iaas-api-position';
 
@@ -34,7 +35,7 @@ export async function getBtgPosition(accountNumber: string): Promise<UnifiedPosi
     const status = err?.response?.status;
     const data = err?.response?.data;
 
-    logger.error(`BTG: erro ao buscar posição`, { accountNumber, status, data });
+    logger.error(`BTG: erro ao buscar posição`, { accountNumber: maskDoc(accountNumber), status, motivo: safeErrData(data) });
 
     if (status === 401) {
       throw new ConsolidatorError('BTG_UNAUTHORIZED', 'Token BTG inválido ou expirado', 'BTG', 401);

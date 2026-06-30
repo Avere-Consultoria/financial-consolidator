@@ -2,6 +2,7 @@ import axios from 'axios';
 import { getXpToken, getXpBaseUrl, getXpHttpsAgent } from './auth';
 import { UnifiedPosition, UnifiedAsset, AssetClass, ConsolidatorError } from '../../types';
 import { logger } from '../../utils/logger';
+import { maskDoc, safeErrData } from '../../utils/mask';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // XP Data Access — Posição Consolidada
@@ -51,7 +52,7 @@ export async function getXpPosition(accountNumber: string): Promise<UnifiedPosit
     const status = err?.response?.status;
     const data = err?.response?.data;
 
-    logger.error('XP: erro ao buscar posição', { accountNumber, status, data });
+    logger.error('XP: erro ao buscar posição', { accountNumber: maskDoc(accountNumber), status, motivo: safeErrData(data) });
 
     if (status === 401) {
       // Distingue bloqueio de IP (CDN devolve HTML) de token inválido

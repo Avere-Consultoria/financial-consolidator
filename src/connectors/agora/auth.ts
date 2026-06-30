@@ -26,10 +26,21 @@ export function getAgoraBaseUrl(): string {
 
 export function getAgoraHttpsAgent(): https.Agent {
   try {
+    // Fail-safe: verificação de TLS LIGADA por padrão. Só desliga com opt-in
+    // EXPLÍCITO (AGORA_TLS_INSECURE=true) e NUNCA em produção — assim um env
+    // ausente/typo não desativa a validação da cadeia no agente que transporta
+    // o client_secret + bearer. Para o sandbox com CA própria, prefira fornecer
+    // AGORA_CA_BASE64 a desligar a verificação. Mesmo padrão do XP (#39).
+    const insecure = process.env.AGORA_TLS_INSECURE === 'true'
+      && process.env.NODE_ENV !== 'production';
+    const ca = (process.env.AGORA_CA_BASE64 || process.env.AGORA_CA_PATH)
+      ? loadCert('AGORA_CA_BASE64', 'AGORA_CA_PATH')
+      : undefined;
     return new https.Agent({
       cert: loadCert('AGORA_CERT_BASE64', 'AGORA_CERT_PATH'),
       key:  loadCert('AGORA_KEY_BASE64',  'AGORA_KEY_PATH'),
-      rejectUnauthorized: process.env.AGORA_ENVIRONMENT === 'production',
+      ...(ca ? { ca } : {}),
+      rejectUnauthorized: !insecure,
     });
   } catch (err: any) {
     throw new ConsolidatorError(
@@ -102,9 +113,10 @@ async function _fetchNewToken(): Promise<string> {
     return data.access_token;
 
   } catch (err: any) {
+    // Não despeja err.response.data (corpo cru da corretora) nos logs do Railway.
     logger.error('Ágora: erro ao gerar token', {
       status: err?.response?.status,
-      data:   err?.response?.data,
+      erro:   err?.response?.data?.error_description ?? err?.message,
     });
     throw new ConsolidatorError(
       'AGORA_AUTH_ERROR',

@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../../utils/logger';
+import { safeErrData } from '../../utils/mask';
 import { ConsolidatorError } from '../../types';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -78,7 +79,7 @@ export async function getBtgToken(): Promise<string> {
   } catch (err: any) {
     if (err instanceof ConsolidatorError) throw err;
 
-    logger.error('BTG: erro ao gerar token', { status: err?.response?.status, data: err?.response?.data });
+    logger.error('BTG: erro ao gerar token', { status: err?.response?.status, motivo: safeErrData(err?.response?.data) });
 
     throw new ConsolidatorError(
       'BTG_AUTH_ERROR',

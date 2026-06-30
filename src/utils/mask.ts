@@ -15,3 +15,16 @@ export function maskDoc(valor: string | null | undefined): string {
 export function maskUrl(url: string): string {
   return url.replace(/\d{8,14}/g, (m) => maskDoc(m));
 }
+
+// Extrai uma mensagem CURTA e segura de um err.response.data p/ log.
+// Nunca devolve o corpo cru: se for objeto, pega só um campo de mensagem
+// conhecido; se for string/HTML (pode conter conteúdo sensível), não loga.
+export function safeErrData(data: unknown): string | undefined {
+  if (data == null) return undefined;
+  if (typeof data === 'object') {
+    const d = data as Record<string, any>;
+    const msg = d.message ?? d.error_description ?? d.error ?? d.mensagem;
+    return typeof msg === 'string' ? msg.slice(0, 200) : undefined;
+  }
+  return undefined;
+}

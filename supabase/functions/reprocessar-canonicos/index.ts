@@ -1,6 +1,6 @@
 import { createServiceClient } from '../_shared/supabaseClient.ts'
 import { corsHeaders, errorResponse, jsonResponse } from '../_shared/cors.ts'
-import { validarAuth, ehChamadaSistema } from '../_shared/auth.ts'
+import { validarAuth, exigirMaster, ehChamadaSistema } from '../_shared/auth.ts'
 import { fetchConsolidator, ConsolidatorError } from '../_shared/consolidator.ts'
 import { resolverContaPorId } from '../_shared/contas.ts'
 import { resolverCanonicoXP } from '../_shared/resolveXP.ts'
@@ -40,6 +40,10 @@ Deno.serve(async (req) => {
     if (!sistema) {
       const authResult = await validarAuth(req)
       if ('error' in authResult) return authResult.error
+      // Reprocesso reescreve a inteligência canônica GLOBAL → só master no caminho
+      // de usuário (o cron já entra por ehChamadaSistema, dispensando JWT/master).
+      const masterError = exigirMaster(authResult.ctx)
+      if (masterError) return masterError
     }
 
     const supabase = createServiceClient()

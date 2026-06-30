@@ -34,6 +34,14 @@ Deno.serve(async (req) => {
       return errorResponse('Faltam campos: clienteId, contaId, dataReferencia, arquivos', 400)
     }
 
+    // Limites anti-abuso (amplificação de webhook / OOM do isolate).
+    const MAX_ARQUIVOS    = 20
+    const MAX_BYTES_ARQ   = 15 * 1024 * 1024   // 15 MB por arquivo
+    const MAX_BYTES_TOTAL = 40 * 1024 * 1024   // 40 MB no total
+    if (arquivosIn.length > MAX_ARQUIVOS) {
+      return errorResponse(`Máximo de ${MAX_ARQUIVOS} arquivos por envio`, 413)
+    }
+
     // Posse do cliente (consultor responsável ou master).
     const ownerError = await validarOwnershipCliente(ctx, clienteId)
     if (ownerError) return ownerError
@@ -68,9 +76,20 @@ Deno.serve(async (req) => {
 
     // Decodifica TODOS os arquivos (aceita data URL ou base64 puro).
     const arquivos: { bytes: Uint8Array; nome: string; tipo: string }[] = []
+    let totalBytes = 0
     for (const a of arquivosIn) {
       const raw = String(a?.base64 ?? '').replace(/^data:.*;base64,/, '')
       if (!raw) continue
+      // Estima o tamanho pelo base64 (≈ 3/4 do comprimento) ANTES de decodificar,
+      // pra rejeitar sem alocar o arquivo todo em memória.
+      const estBytes = Math.floor(raw.length * 3 / 4)
+      if (estBytes > MAX_BYTES_ARQ) {
+        return errorResponse(`Arquivo "${a?.nome ?? '?'}" excede ${MAX_BYTES_ARQ / 1024 / 1024}MB`, 413)
+      }
+      totalBytes += estBytes
+      if (totalBytes > MAX_BYTES_TOTAL) {
+        return errorResponse(`Tamanho total dos arquivos excede ${MAX_BYTES_TOTAL / 1024 / 1024}MB`, 413)
+      }
       let bytes: Uint8Array
       try {
         bytes = Uint8Array.from(atob(raw), c => c.charCodeAt(0))

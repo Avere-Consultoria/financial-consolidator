@@ -4,6 +4,7 @@ import * as tls from 'tls';
 import { logger } from '../../utils/logger';
 import { ConsolidatorError } from '../../types';
 import { loadCert } from '../../utils/certLoader';
+import { safeErrData } from '../../utils/mask';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // XP Auth — OAuth2 Client Credentials via Azure AD + mTLS
@@ -138,7 +139,7 @@ export async function getXpToken(): Promise<string> {
   } catch (err: any) {
     logger.error('XP: erro ao gerar token', {
       status: err?.response?.status,
-      data: err?.response?.data,
+      motivo: safeErrData(err?.response?.data),
     });
 
     throw new ConsolidatorError(
